@@ -301,6 +301,8 @@ function Home() {
                   <Button
                     variant="outlined"
                     size="large"
+                    component={Link}
+                    to="/explore"
                     sx={{ 
                       borderColor: 'rgba(255,255,255,0.8)',
                       color: 'white',
@@ -1083,4 +1085,4 @@ function Home() {
   );
 }
 
-export default Home; 
+export default Home;
