@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -21,7 +21,7 @@ import {
   ListItemText,
   useTheme,
   useMediaQuery,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Search as SearchIcon,
   KeyboardArrowDown,
@@ -31,78 +31,82 @@ import {
   ExitToApp as LogoutIcon,
   Menu as MenuIcon,
   Category as CategoryIcon,
-} from '@mui/icons-material';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import Logo from './Logo';
+} from "@mui/icons-material";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import Logo from "./Logo";
 
-const Search = styled('div')(({ theme }) => ({
-  position: 'relative',
+const Search = styled("div")(({ theme }) => ({
+  position: "relative",
   borderRadius: theme.shape.borderRadius,
   backgroundColor: alpha(theme.palette.common.white, 0.15),
-  '&:hover': {
+  "&:hover": {
     backgroundColor: alpha(theme.palette.common.white, 0.25),
   },
   marginRight: theme.spacing(2),
   marginLeft: 0,
-  width: '100%',
-  [theme.breakpoints.up('sm')]: {
+  width: "100%",
+  [theme.breakpoints.up("sm")]: {
     marginLeft: theme.spacing(3),
-    width: 'auto',
+    width: "auto",
   },
 }));
 
-const SearchIconWrapper = styled('div')(({ theme }) => ({
+const SearchIconWrapper = styled("div")(({ theme }) => ({
   padding: theme.spacing(0, 2),
-  height: '100%',
-  position: 'absolute',
-  pointerEvents: 'none',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
+  height: "100%",
+  position: "absolute",
+  pointerEvents: "none",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
 }));
 
 const StyledInputBase = styled(InputBase)(({ theme }) => ({
-  color: 'inherit',
-  '& .MuiInputBase-input': {
+  color: "inherit",
+  "& .MuiInputBase-input": {
     padding: theme.spacing(1, 1, 1, 0),
     paddingLeft: `calc(1em + ${theme.spacing(4)})`,
-    transition: theme.transitions.create('width'),
-    width: '100%',
-    [theme.breakpoints.up('md')]: {
-      width: '20ch',
-      '&:focus': {
-        width: '30ch',
+    transition: theme.transitions.create("width"),
+    width: "100%",
+    [theme.breakpoints.up("md")]: {
+      width: "20ch",
+      "&:focus": {
+        width: "30ch",
       },
     },
   },
 }));
 
 const categories = [
-  { id: 1, name: 'Technology', icon: '🚀', color: '#1A237E' },
-  { id: 2, name: 'Design', icon: '🎨', color: '#B71C1C' },
-  { id: 3, name: 'Development', icon: '💻', color: '#1B5E20' },
-  { id: 4, name: 'Business', icon: '📈', color: '#4A148C' },
-  { id: 5, name: 'Lifestyle', icon: '🌟', color: '#E65100' },
-  { id: 6, name: 'Science', icon: '🔬', color: '#01579B' },
-  { id: 7, name: 'Food & Cooking', icon: '🍳', color: '#BF360C' },
-  { id: 8, name: 'Travel', icon: '✈️', color: '#0D47A1' },
-  { id: 9, name: 'Health & Fitness', icon: '💪', color: '#2E7D32' },
-  { id: 10, name: 'Arts & Culture', icon: '🎭', color: '#6A1B9A' },
-  { id: 11, name: 'Education', icon: '📚', color: '#C2185B' },
-  { id: 12, name: 'Environment', icon: '🌱', color: '#1B5E20' }
+  { id: 1, name: "Technology", icon: "🚀", color: "#1A237E" },
+  { id: 2, name: "Design", icon: "🎨", color: "#B71C1C" },
+  { id: 3, name: "Development", icon: "💻", color: "#1B5E20" },
+  { id: 4, name: "Business", icon: "📈", color: "#4A148C" },
+  { id: 5, name: "Lifestyle", icon: "🌟", color: "#E65100" },
+  { id: 6, name: "Science", icon: "🔬", color: "#01579B" },
+  { id: 7, name: "Food & Cooking", icon: "🍳", color: "#BF360C" },
+  { id: 8, name: "Travel", icon: "✈️", color: "#0D47A1" },
+  { id: 9, name: "Health & Fitness", icon: "💪", color: "#2E7D32" },
+  { id: 10, name: "Arts & Culture", icon: "🎭", color: "#6A1B9A" },
+  { id: 11, name: "Education", icon: "📚", color: "#C2185B" },
+  { id: 12, name: "Environment", icon: "🌱", color: "#1B5E20" },
 ];
 
 function Navbar() {
   const navigate = useNavigate();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const { user, logout } = useAuth();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [categoryAnchorEl, setCategoryAnchorEl] = useState<null | HTMLElement>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryAnchorEl, setCategoryAnchorEl] = useState<null | HTMLElement>(
+    null
+  );
+  const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [categoriesAnchor, setCategoriesAnchor] = useState<null | HTMLElement>(null);
+  const [categoriesAnchor, setCategoriesAnchor] = useState<null | HTMLElement>(
+    null
+  );
 
   const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -118,7 +122,7 @@ function Navbar() {
   };
 
   const handleSearch = (event: React.KeyboardEvent) => {
-    if (event.key === 'Enter') {
+    if (event.key === "Enter") {
       navigate(`/search?q=${searchQuery}`);
       if (isMobile) {
         setMobileMenuOpen(false);
@@ -132,26 +136,26 @@ function Navbar() {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate("/");
   };
 
   const mobileMenuItems = [
     {
-      text: 'Categories',
+      text: "Categories",
       icon: <CategoryIcon />,
       onClick: () => setCategoryAnchorEl(null),
       hasSubmenu: true,
     },
-    { text: 'Write', icon: <EditIcon />, to: '/write' },
+    { text: "Write", icon: <EditIcon />, to: "/write" },
     ...(user
       ? [
-          { text: 'Dashboard', icon: <DashboardIcon />, to: '/dashboard' },
-          { text: 'Profile', icon: <PersonIcon />, to: '/profile' },
-          { text: 'Logout', icon: <LogoutIcon />, onClick: handleLogout },
+          { text: "Dashboard", icon: <DashboardIcon />, to: "/dashboard" },
+          { text: "Profile", icon: <PersonIcon />, to: "/profile" },
+          { text: "Logout", icon: <LogoutIcon />, onClick: handleLogout },
         ]
       : [
-          { text: 'Login', icon: <PersonIcon />, to: '/login' },
-          { text: 'Sign Up', icon: <PersonIcon />, to: '/register' },
+          { text: "Login", icon: <PersonIcon />, to: "/login" },
+          { text: "Sign Up", icon: <PersonIcon />, to: "/register" },
         ]),
   ];
 
@@ -161,9 +165,9 @@ function Navbar() {
         <Toolbar
           disableGutters
           sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            flexWrap: 'nowrap',
+            display: "flex",
+            justifyContent: "space-between",
+            flexWrap: "nowrap",
           }}
         >
           {/* Mobile Menu Icon */}
@@ -184,10 +188,10 @@ function Navbar() {
             component={Link}
             to="/"
             sx={{
-              display: 'flex',
-              alignItems: 'center',
+              display: "flex",
+              alignItems: "center",
               gap: 1,
-              textDecoration: 'none',
+              textDecoration: "none",
               flexShrink: 0,
             }}
           >
@@ -196,9 +200,9 @@ function Navbar() {
               variant="h6"
               sx={{
                 fontWeight: 700,
-                background: 'linear-gradient(45deg, #024950 30%, #0FA4AF 90%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
+                background: "linear-gradient(45deg, #024950 30%, #0FA4AF 90%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
               }}
             >
               BlogVerse
@@ -208,15 +212,15 @@ function Navbar() {
           {/* Desktop Navigation */}
           {!isMobile && (
             <>
-              <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", ml: 2 }}>
                 <Button
                   startIcon={<CategoryIcon />}
                   endIcon={<KeyboardArrowDown />}
                   onClick={(e) => setCategoriesAnchor(e.currentTarget)}
                   sx={{
-                    color: 'inherit',
-                    textTransform: 'none',
-                    '&:hover': {
+                    color: "inherit",
+                    textTransform: "none",
+                    "&:hover": {
                       backgroundColor: alpha(theme.palette.common.white, 0.1),
                     },
                   }}
@@ -231,10 +235,11 @@ function Navbar() {
                     sx: {
                       mt: 1.5,
                       minWidth: 200,
-                      background: theme.palette.mode === 'dark' 
-                        ? 'rgba(0, 30, 60, 0.8)'
-                        : 'rgba(255, 255, 255, 0.8)',
-                      backdropFilter: 'blur(10px)',
+                      background:
+                        theme.palette.mode === "dark"
+                          ? "rgba(0, 30, 60, 0.8)"
+                          : "rgba(255, 255, 255, 0.8)",
+                      backdropFilter: "blur(10px)",
                       border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
                     },
                   }}
@@ -247,16 +252,21 @@ function Navbar() {
                         navigate(`/category/${category.name.toLowerCase()}`);
                       }}
                       sx={{
-                        display: 'flex',
-                        alignItems: 'center',
+                        display: "flex",
+                        alignItems: "center",
                         gap: 1,
                         py: 1.5,
-                        '&:hover': {
-                          backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                        "&:hover": {
+                          backgroundColor: alpha(
+                            theme.palette.primary.main,
+                            0.1
+                          ),
                         },
                       }}
                     >
-                      <Typography sx={{ fontSize: '1.2rem' }}>{category.icon}</Typography>
+                      <Typography sx={{ fontSize: "1.2rem" }}>
+                        {category.icon}
+                      </Typography>
                       <Typography
                         sx={{
                           color: category.color,
@@ -280,7 +290,7 @@ function Navbar() {
                   onKeyPress={handleSearch}
                 />
               </Search>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                 {user ? (
                   <>
                     <Button
@@ -288,10 +298,13 @@ function Navbar() {
                       to="/write"
                       startIcon={<EditIcon />}
                       sx={{
-                        color: 'inherit',
-                        textTransform: 'none',
-                        '&:hover': {
-                          backgroundColor: alpha(theme.palette.common.white, 0.1),
+                        color: "inherit",
+                        textTransform: "none",
+                        "&:hover": {
+                          backgroundColor: alpha(
+                            theme.palette.common.white,
+                            0.1
+                          ),
                         },
                       }}
                     >
@@ -316,11 +329,15 @@ function Navbar() {
                         sx: {
                           mt: 1.5,
                           minWidth: 180,
-                          background: theme.palette.mode === 'dark' 
-                            ? 'rgba(0, 30, 60, 0.8)'
-                            : 'rgba(255, 255, 255, 0.8)',
-                          backdropFilter: 'blur(10px)',
-                          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                          background:
+                            theme.palette.mode === "dark"
+                              ? "rgba(0, 30, 60, 0.8)"
+                              : "rgba(255, 255, 255, 0.8)",
+                          backdropFilter: "blur(10px)",
+                          border: `1px solid ${alpha(
+                            theme.palette.divider,
+                            0.1
+                          )}`,
                         },
                       }}
                     >
@@ -329,12 +346,15 @@ function Navbar() {
                         to="/dashboard"
                         onClick={handleMenuClose}
                         sx={{
-                          display: 'flex',
-                          alignItems: 'center',
+                          display: "flex",
+                          alignItems: "center",
                           gap: 1,
                           py: 1.5,
-                          '&:hover': {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                          "&:hover": {
+                            backgroundColor: alpha(
+                              theme.palette.primary.main,
+                              0.1
+                            ),
                           },
                         }}
                       >
@@ -346,12 +366,15 @@ function Navbar() {
                         to="/profile"
                         onClick={handleMenuClose}
                         sx={{
-                          display: 'flex',
-                          alignItems: 'center',
+                          display: "flex",
+                          alignItems: "center",
                           gap: 1,
                           py: 1.5,
-                          '&:hover': {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                          "&:hover": {
+                            backgroundColor: alpha(
+                              theme.palette.primary.main,
+                              0.1
+                            ),
                           },
                         }}
                       >
@@ -364,13 +387,16 @@ function Navbar() {
                           handleLogout();
                         }}
                         sx={{
-                          display: 'flex',
-                          alignItems: 'center',
+                          display: "flex",
+                          alignItems: "center",
                           gap: 1,
                           py: 1.5,
                           color: theme.palette.error.main,
-                          '&:hover': {
-                            backgroundColor: alpha(theme.palette.error.main, 0.1),
+                          "&:hover": {
+                            backgroundColor: alpha(
+                              theme.palette.error.main,
+                              0.1
+                            ),
                           },
                         }}
                       >
@@ -385,10 +411,13 @@ function Navbar() {
                       component={Link}
                       to="/login"
                       sx={{
-                        color: 'inherit',
-                        textTransform: 'none',
-                        '&:hover': {
-                          backgroundColor: alpha(theme.palette.common.white, 0.1),
+                        color: "inherit",
+                        textTransform: "none",
+                        "&:hover": {
+                          backgroundColor: alpha(
+                            theme.palette.common.white,
+                            0.1
+                          ),
                         },
                       }}
                     >
@@ -399,10 +428,12 @@ function Navbar() {
                       to="/register"
                       variant="contained"
                       sx={{
-                        textTransform: 'none',
-                        background: 'linear-gradient(135deg, #0FA4AF 0%, #AFDDE5 100%)',
-                        '&:hover': {
-                          background: 'linear-gradient(135deg, #024950 0%, #0FA4AF 100%)',
+                        textTransform: "none",
+                        background:
+                          "linear-gradient(135deg, #0FA4AF 0%, #AFDDE5 100%)",
+                        "&:hover": {
+                          background:
+                            "linear-gradient(135deg, #024950 0%, #0FA4AF 100%)",
                         },
                       }}
                     >
@@ -423,10 +454,11 @@ function Navbar() {
         onClose={() => setMobileMenuOpen(false)}
         PaperProps={{
           sx: {
-            background: theme.palette.mode === 'dark' 
-              ? 'rgba(0, 30, 60, 0.8)'
-              : 'rgba(255, 255, 255, 0.8)',
-            backdropFilter: 'blur(10px)',
+            background:
+              theme.palette.mode === "dark"
+                ? "rgba(0, 30, 60, 0.8)"
+                : "rgba(255, 255, 255, 0.8)",
+            backdropFilter: "blur(10px)",
             border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
           },
         }}
@@ -436,7 +468,7 @@ function Navbar() {
             <ListItem
               key={index}
               button
-              component={item.to ? Link : 'div'}
+              component={item.to ? Link : "div"}
               to={item.to}
               onClick={() => {
                 if (item.onClick) {
@@ -446,14 +478,12 @@ function Navbar() {
               }}
               sx={{
                 py: 1.5,
-                '&:hover': {
+                "&:hover": {
                   backgroundColor: alpha(theme.palette.primary.main, 0.1),
                 },
               }}
             >
-              <ListItemIcon sx={{ minWidth: 40 }}>
-                {item.icon}
-              </ListItemIcon>
+              <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} />
             </ListItem>
           ))}
@@ -463,4 +493,4 @@ function Navbar() {
   );
 }
 
-export default Navbar; 
+export default Navbar;
