@@ -19,4 +19,29 @@ cloudinary.defaultTransformations = {
   ],
 };
 
+cloudinary.listResources = async (folder) => {
+  try {
+    const result = await cloudinary.api.resources({
+      type: "upload",
+      prefix: folder,
+      max_results: 500,
+    });
+    return result.resources;
+  } catch (error) {
+    console.error("Error fetching Cloudinary resources:", error);
+    return [];
+  }
+};
+
+cloudinary.validateImageUrl = async (url) => {
+  try {
+    const response = await fetch(url, { method: "HEAD" });
+    const contentType = response.headers.get("content-type");
+    return response.ok && contentType?.startsWith("image/");
+  } catch (error) {
+    console.error("Error validating image URL:", error);
+    return false;
+  }
+};
+
 module.exports = cloudinary;

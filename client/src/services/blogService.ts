@@ -37,10 +37,14 @@ export const getAllBlogs = async () => {
 
 export const getBlogsByCategory = async (category: string) => {
   try {
-    const formattedCategory = encodeURIComponent(category.toLowerCase().trim());
+    // Keep original case but trim whitespace
+    const formattedCategory = encodeURIComponent(category.trim());
+    console.log("Requesting category:", formattedCategory);
+
     const response = await axios.get(
       `${API_URL}/category/${formattedCategory}`
     );
+    console.log("Category response:", response.data);
     return response.data;
   } catch (error: any) {
     console.error("Error fetching blogs by category:", error);
@@ -61,18 +65,44 @@ export const getCategories = async () => {
   }
 };
 
-export const getBlogStats = async () => {
+interface BlogStats {
+  totalViews: number;
+  totalComments: number;
+  averageReadTime: number;
+  engagementRate: number;
+  categoryCounts: Array<{ name: string; value: number }>;
+  viewTrend: Array<{ name: string; views: number; trend: number }>;
+}
+
+export const getBlogStats = async (): Promise<BlogStats> => {
+  try {
+    const response = await axios.get(`${API_URL}/stats`);
+    return {
+      totalViews: response.data.totalViews || 0,
+      totalComments: response.data.totalComments || 0,
+      averageReadTime: response.data.averageReadTime || 0,
+      engagementRate: response.data.engagementRate || 0,
+      categoryCounts: response.data.categoryCounts || [],
+      viewTrend: response.data.viewTrend || [],
+    };
+  } catch (error) {
+    console.error("Error fetching blog stats:", error);
+    throw new Error("Failed to fetch blog statistics");
+  }
+};
+
+export const getAnalytics = async () => {
   try {
     const token = localStorage.getItem("token");
-    const response = await axios.get(`${API_URL}/stats`, {
+    const response = await axios.get(`${API_URL}/analytics`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
     return response.data;
   } catch (error) {
-    console.error("Error fetching stats:", error);
-    throw new Error("Failed to fetch blog stats");
+    console.error("Error fetching analytics:", error);
+    throw new Error("Failed to fetch analytics data");
   }
 };
 

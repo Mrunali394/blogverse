@@ -5,10 +5,13 @@ import {
   Typography,
   CardActionArea,
   Box,
+  CardActions,
+  Button,
 } from "@mui/material";
-import { Article } from "@mui/icons-material";
+import { Article, Edit } from "@mui/icons-material";
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import { formatDateTime } from "../utils/dateUtils";
 
 interface BlogPost {
   _id: string;
@@ -25,10 +28,29 @@ interface BlogPost {
 
 interface Props {
   post: BlogPost;
+  isDraft?: boolean;
+  onEdit?: () => void;
 }
 
-function BlogCard({ post }: Props) {
+function BlogCard({ post, isDraft, onEdit }: Props) {
   const [imageError, setImageError] = useState(false);
+
+  const optimizeCloudinaryUrl = (url: string) => {
+    if (url && url.includes("cloudinary.com")) {
+      // Add transformation parameters for blog card view
+      const imageUrl = new URL(url);
+      const transformationString = "/c_fill,w_400,h_250,q_auto,f_auto";
+      const pathParts = imageUrl.pathname.split("/");
+      const uploadIndex = pathParts.indexOf("upload");
+      if (uploadIndex !== -1) {
+        pathParts.splice(uploadIndex + 1, 0, transformationString);
+        imageUrl.pathname = pathParts.join("/");
+        return imageUrl.toString();
+      }
+    }
+    return url;
+  };
+
   const hasValidImage =
     post.coverImage &&
     typeof post.coverImage === "string" &&
@@ -42,16 +64,41 @@ function BlogCard({ post }: Props) {
   return (
     <Card
       sx={{
+        position: "relative",
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+        borderRadius: 2,
+        overflow: "hidden",
+        transition: "all 0.3s ease-in-out",
+        backgroundColor: "background.paper",
         "&:hover": {
           transform: "translateY(-4px)",
-          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
+          boxShadow: (theme) => `0 8px 24px ${theme.palette.primary.main}25`,
         },
       }}
     >
+      {isDraft && (
+        <Box
+          sx={{
+            position: "absolute",
+            top: 16,
+            right: 16,
+            bgcolor: "warning.main",
+            color: "warning.contrastText",
+            px: 2,
+            py: 0.5,
+            borderRadius: "20px",
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            zIndex: 2,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          Draft
+        </Box>
+      )}
       <CardActionArea
         component={Link}
         to={`/blog/${post._id}`}
@@ -62,81 +109,152 @@ function BlogCard({ post }: Props) {
           alignItems: "stretch",
         }}
       >
-        {hasValidImage ? (
-          <CardMedia
-            component="img"
-            height="200"
-            image={post.coverImage}
-            alt={post.title}
-            onError={handleImageError}
-            sx={{
-              objectFit: "cover",
-              backgroundColor: "rgba(0, 0, 0, 0.04)",
-              transition: "all 0.3s ease-in-out",
-              "&:hover": {
-                transform: "scale(1.05)",
-                filter: "brightness(0.9)",
-              },
-            }}
-            loading="lazy"
-          />
-        ) : (
-          <Box
-            sx={{
-              height: 200,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              bgcolor: "rgba(0, 0, 0, 0.03)",
-              background:
-                "linear-gradient(45deg, rgba(2, 73, 80, 0.05), rgba(15, 164, 175, 0.1))",
-              transition: "all 0.3s ease-in-out",
-              "&:hover": {
-                background:
-                  "linear-gradient(45deg, rgba(2, 73, 80, 0.1), rgba(15, 164, 175, 0.15))",
-              },
-            }}
-          >
-            <Article
+        <Box sx={{ position: "relative", paddingTop: "56.25%" }}>
+          {hasValidImage ? (
+            <CardMedia
+              component="img"
+              image={optimizeCloudinaryUrl(post.coverImage!)}
+              alt={post.title}
+              onError={handleImageError}
               sx={{
-                fontSize: 80,
-                color: "primary.main",
-                opacity: 0.3,
-                transition:
-                  "transform 0.3s ease-in-out, opacity 0.3s ease-in-out",
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                transition: "all 0.5s ease-in-out",
                 "&:hover": {
-                  transform: "scale(1.1)",
-                  opacity: 0.4,
+                  transform: "scale(1.05)",
                 },
               }}
+              loading="lazy"
             />
-          </Box>
-        )}
-        <CardContent sx={{ flexGrow: 1 }}>
-          <Typography
-            gutterBottom
-            variant="h6"
-            component="div"
+          ) : (
+            <Box
+              sx={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: (theme) =>
+                  `linear-gradient(45deg, ${theme.palette.primary.main}15, ${theme.palette.secondary.main}15)`,
+                transition: "all 0.3s ease-in-out",
+              }}
+            >
+              <Article
+                sx={{
+                  fontSize: 64,
+                  color: "primary.main",
+                  opacity: 0.5,
+                  transition: "all 0.3s ease-in-out",
+                }}
+              />
+            </Box>
+          )}
+          <Box
             sx={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background:
+                "linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.1) 100%)",
+              transition: "opacity 0.3s ease-in-out",
+              opacity: 0,
+              "&:hover": {
+                opacity: 1,
+              },
+            }}
+          />
+        </Box>
+
+        <CardContent sx={{ flexGrow: 1, p: 3 }}>
+          <Box sx={{ mb: 2 }}>
+            <Typography
+              variant="overline"
+              sx={{
+                color: "primary.main",
+                fontWeight: 600,
+                letterSpacing: 1,
+              }}
+            >
+              {post.category}
+            </Typography>
+          </Box>
+
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: 600,
               overflow: "hidden",
               textOverflow: "ellipsis",
               display: "-webkit-box",
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
-              lineHeight: 1.3,
-              minHeight: "2.6em",
+              lineHeight: 1.4,
+              minHeight: "2.8em",
+              mb: 1,
             }}
           >
             {post.title}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            By {post.user.name} • {post.category}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" component="div">
-            {new Date(post.createdAt).toLocaleDateString()}
-          </Typography>
+
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              mt: 2,
+            }}
+          >
+            <Typography
+              variant="body2"
+              sx={{
+                color: "text.secondary",
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+              }}
+            >
+              By {post.user.name}
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: "text.secondary",
+                fontWeight: 500,
+              }}
+            >
+              {formatDateTime(post.createdAt)}
+            </Typography>
+          </Box>
         </CardContent>
       </CardActionArea>
+
+      {onEdit && isDraft && (
+        <CardActions sx={{ p: 2, pt: 0 }}>
+          <Button
+            size="small"
+            onClick={onEdit}
+            startIcon={<Edit />}
+            sx={{
+              color: "primary.main",
+              "&:hover": {
+                backgroundColor: "primary.main",
+                color: "white",
+              },
+            }}
+          >
+            Continue Editing
+          </Button>
+        </CardActions>
+      )}
     </Card>
   );
 }

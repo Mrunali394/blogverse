@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import { useParams } from "react-router-dom";
 import { getBlog } from "../../services/blogService";
+import { formatDateTime } from "../../utils/dateUtils";
 
 interface BlogPost {
   title: string;
@@ -23,11 +24,29 @@ function BlogPost() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const optimizeCloudinaryUrl = (url: string) => {
+    if (url && url.includes("cloudinary.com")) {
+      const imageUrl = new URL(url);
+      const transformationString = "/c_fill,w_1200,h_630,q_auto,f_auto";
+      const pathParts = imageUrl.pathname.split("/");
+      const uploadIndex = pathParts.indexOf("upload");
+      if (uploadIndex !== -1) {
+        pathParts.splice(uploadIndex + 1, 0, transformationString);
+        imageUrl.pathname = pathParts.join("/");
+        return imageUrl.toString();
+      }
+    }
+    return url;
+  };
+
   useEffect(() => {
     const fetchPost = async () => {
       try {
         if (id) {
           const data = await getBlog(id);
+          if (data.coverImage) {
+            data.coverImage = optimizeCloudinaryUrl(data.coverImage);
+          }
           setPost(data);
         }
       } catch (err) {
@@ -61,14 +80,29 @@ function BlogPost() {
       <Box sx={{ mt: 4, mb: 8 }}>
         <Paper elevation={3} sx={{ p: 4 }}>
           {post.coverImage && (
-            <Box sx={{ mb: 3 }}>
+            <Box
+              sx={{
+                mb: 3,
+                width: "100%",
+                maxHeight: "500px",
+                overflow: "hidden",
+                borderRadius: 1,
+              }}
+            >
               <img
                 src={post.coverImage}
                 alt={post.title}
                 style={{
                   width: "100%",
-                  maxHeight: "400px",
-                  objectFit: "cover",
+                  height: "100%",
+                  objectFit: "contain",
+                  maxHeight: "500px",
+                }}
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null;
+                  target.src = "/placeholder-image.png"; // Add a placeholder image
+                  console.error("Error loading image:", post.coverImage);
                 }}
               />
             </Box>
@@ -77,7 +111,7 @@ function BlogPost() {
             {post.title}
           </Typography>
           <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-            {new Date(post.createdAt).toLocaleDateString()} • {post.category}
+            {formatDateTime(post.createdAt)} • {post.category}
           </Typography>
           <Box sx={{ mt: 4 }}>
             <div dangerouslySetInnerHTML={{ __html: post.content }} />
