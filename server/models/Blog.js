@@ -49,6 +49,15 @@ const BlogSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
+  isDraft: {
+    type: Boolean,
+    default: false,
+  },
+  status: {
+    type: String,
+    enum: ["draft", "published"],
+    default: "published",
+  },
   date: {
     type: Date,
     default: Date.now,
@@ -56,6 +65,10 @@ const BlogSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now,
+  },
+  views: {
+    type: Number,
+    default: 0,
   },
 });
 

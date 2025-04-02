@@ -16,6 +16,7 @@ import CategoryView from "./pages/blog/CategoryView";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import ExploreBlogsPage from "./pages/blog/ExploreBlogsPage";
+import Analytics from "./pages/Analytics";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { Box } from "@mui/material";
@@ -205,6 +206,14 @@ function App() {
                     element={<CategoryView />}
                   />
                   <Route path="/explore" element={<ExploreBlogsPage />} />
+                  <Route
+                    path="/analytics"
+                    element={
+                      <ProtectedRoute>
+                        <Analytics />
+                      </ProtectedRoute>
+                    }
+                  />
                 </Routes>
               </Box>
               <Footer />

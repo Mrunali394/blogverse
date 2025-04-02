@@ -59,6 +59,7 @@ function CreatePost() {
     category: "",
     content: "",
     coverImage: "",
+    isDraft: false, // Add draft status
   });
   const [errors, setErrors] = useState({
     title: "",
@@ -66,6 +67,7 @@ function CreatePost() {
     content: "",
     coverImage: "", // Add coverImage error
   });
+  const [submitError, setSubmitError] = useState<string>("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -137,17 +139,70 @@ function CreatePost() {
     return isValid;
   };
 
+  const validateDraft = () => {
+    let isValid = true;
+    const newErrors = {
+      title: "",
+      category: "",
+      content: "",
+      coverImage: "",
+    };
+
+    // Only validate title for drafts
+    if (!formData.title.trim()) {
+      newErrors.title = "Title is required even for drafts";
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError("");
+
     if (validateForm()) {
       try {
         setIsSubmitting(true);
-        const newBlog = await createBlog(formData);
+        const newBlog = await createBlog({
+          ...formData,
+          isDraft: false, // Explicitly set to false for published posts
+        });
         setIsSubmitting(false);
         navigate(`/blog/${newBlog._id}`);
       } catch (error) {
         setIsSubmitting(false);
+        setSubmitError("Failed to publish blog post. Please try again.");
         console.error("Failed to create blog post:", error);
+      }
+    }
+  };
+
+  const saveDraft = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent form submission
+    setSubmitError("");
+
+    if (validateDraft()) {
+      try {
+        setIsSubmitting(true);
+        const draftBlog = await createBlog({
+          ...formData,
+          isDraft: true, // Explicitly set to true for drafts
+        });
+        setIsSubmitting(false);
+
+        navigate("/dashboard", {
+          state: {
+            notification: "Draft saved successfully!",
+            draftId: draftBlog._id,
+            isDraft: true,
+          },
+        });
+      } catch (error) {
+        setIsSubmitting(false);
+        setSubmitError("Failed to save draft. Please try again.");
+        console.error("Failed to save draft:", error);
       }
     }
   };
@@ -185,6 +240,11 @@ function CreatePost() {
           Create New Blog Post
         </Typography>
         <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
+          {submitError && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              {submitError}
+            </Typography>
+          )}
           <Box component="form" onSubmit={handleSubmit}>
             <TextField
               fullWidth
@@ -325,8 +385,14 @@ function CreatePost() {
               >
                 {isSubmitting ? "Publishing..." : "Publish Post"}
               </Button>
-              <Button variant="outlined" color="secondary" size="large">
-                Save as Draft
+              <Button
+                variant="outlined"
+                color="secondary"
+                size="large"
+                onClick={saveDraft} // Changed from type="button"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Saving..." : "Save as Draft"}
               </Button>
             </Box>
           </Box>
