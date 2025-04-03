@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   AppBar,
   Toolbar,
@@ -21,6 +21,8 @@ import {
   ListItemText,
   useTheme,
   useMediaQuery,
+  CircularProgress,
+  Paper,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -31,10 +33,23 @@ import {
   ExitToApp as LogoutIcon,
   Menu as MenuIcon,
   Category as CategoryIcon,
+  Article,
 } from "@mui/icons-material";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Logo from "./Logo";
+import { debounce } from "lodash";
+import { toast } from "react-toastify";
+import { searchBlogs } from "../services/blogService";
+import { searchUsers } from "../services/userService";
+
+interface SearchResultItem {
+  _id: string;
+  title?: string;
+  name?: string;
+  type: "blog" | "user";
+  profilePicture?: string;
+}
 
 const Search = styled("div")(({ theme }) => ({
   position: "relative",
@@ -107,6 +122,24 @@ function Navbar() {
   const [categoriesAnchor, setCategoriesAnchor] = useState<null | HTMLElement>(
     null
   );
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
+  const [showResults, setShowResults] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        searchRef.current &&
+        !searchRef.current.contains(event.target as Node)
+      ) {
+        setShowResults(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -121,12 +154,51 @@ function Navbar() {
     setCategoryAnchorEl(null);
   };
 
-  const handleSearch = (event: React.KeyboardEvent) => {
-    if (event.key === "Enter") {
-      navigate(`/search?q=${searchQuery}`);
-      if (isMobile) {
-        setMobileMenuOpen(false);
-      }
+  const debouncedSearch = debounce(async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const [blogResults, userResults] = await Promise.all([
+        searchBlogs(query),
+        searchUsers(query),
+      ]);
+
+      const combinedResults = [
+        ...blogResults.map((blog: any) => ({
+          _id: blog._id,
+          title: blog.title,
+          type: "blog" as const,
+        })),
+        ...userResults.map((user: any) => ({
+          _id: user._id,
+          name: user.name,
+          profilePicture: user.profilePicture,
+          type: "user" as const,
+        })),
+      ].slice(0, 5);
+
+      setSearchResults(combinedResults);
+      setShowResults(true);
+    } catch (error) {
+      toast.error("Failed to perform search");
+    } finally {
+      setIsSearching(false);
+    }
+  }, 300);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    debouncedSearch(query);
+  };
+
+  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      debouncedSearch(searchQuery);
     }
   };
 
@@ -279,16 +351,108 @@ function Navbar() {
                   ))}
                 </Menu>
               </Box>
-              <Search sx={{ flexGrow: 1, mx: 2, maxWidth: 400 }}>
+              <Search
+                ref={searchRef}
+                sx={{ flexGrow: 1, mx: 2, maxWidth: 400, position: "relative" }}
+              >
                 <SearchIconWrapper>
-                  <SearchIcon />
+                  {isSearching ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : (
+                    <SearchIcon />
+                  )}
                 </SearchIconWrapper>
                 <StyledInputBase
-                  placeholder="Search blogs..."
+                  placeholder="Search blogs and users..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={handleSearch}
+                  onChange={handleSearchChange}
+                  onKeyPress={(e) =>
+                    e.key === "Enter" &&
+                    navigate("/search", { state: { query: searchQuery } })
+                  }
                 />
+                {showResults && searchResults.length > 0 && (
+                  <Paper
+                    sx={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      mt: 1,
+                      maxHeight: 400,
+                      overflow: "auto",
+                      zIndex: 1000,
+                      bgcolor: "background.paper",
+                      border: 1,
+                      borderColor: "divider",
+                      borderRadius: 1,
+                      boxShadow: 3,
+                    }}
+                  >
+                    {searchResults.map((result) => (
+                      <MenuItem
+                        key={result._id}
+                        component={Link}
+                        to={
+                          result.type === "blog"
+                            ? `/blog/${result._id}`
+                            : `/user/${result._id}`
+                        }
+                        onClick={() => setShowResults(false)}
+                        sx={{
+                          py: 1,
+                          px: 2,
+                          "&:hover": {
+                            bgcolor: "action.hover",
+                          },
+                        }}
+                      >
+                        {result.type === "user" ? (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <Avatar
+                              src={result.profilePicture}
+                              sx={{ width: 32, height: 32 }}
+                            >
+                              {result.name?.[0]}
+                            </Avatar>
+                            <Typography>{result.name}</Typography>
+                          </Box>
+                        ) : (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <Article color="primary" />
+                            <Typography>{result.title}</Typography>
+                          </Box>
+                        )}
+                      </MenuItem>
+                    ))}
+                    <MenuItem
+                      onClick={() => {
+                        navigate("/search", { state: { query: searchQuery } });
+                        setShowResults(false);
+                      }}
+                      sx={{
+                        justifyContent: "center",
+                        color: "primary.main",
+                        borderTop: 1,
+                        borderColor: "divider",
+                      }}
+                    >
+                      View all results
+                    </MenuItem>
+                  </Paper>
+                )}
               </Search>
               <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                 {user ? (

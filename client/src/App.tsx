@@ -17,9 +17,14 @@ import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import ExploreBlogsPage from "./pages/blog/ExploreBlogsPage";
 import Analytics from "./pages/Analytics";
+import UserProfile from "./pages/UserProfile";
+import Search from "./pages/Search";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { Box } from "@mui/material";
+import { NotificationsProvider } from "./context/NotificationsContext";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 export const ColorModeContext = createContext({
   toggleColorMode: () => {},
@@ -157,68 +162,76 @@ function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <AuthProvider>
-          <Router>
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                minHeight: "100vh",
-              }}
-            >
-              <Navbar />
-              <Box component="main" sx={{ flexGrow: 1 }}>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/register" element={<Register />} />
-                  <Route path="/forgot-password" element={<ForgotPassword />} />
-                  <Route
-                    path="/reset-password/:token"
-                    element={<ResetPassword />}
-                  />
-                  <Route path="/blog/:id" element={<BlogPost />} />
-                  <Route
-                    path="/write"
-                    element={
-                      <ProtectedRoute>
-                        <CreatePost />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/dashboard"
-                    element={
-                      <ProtectedRoute>
-                        <Dashboard />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/profile"
-                    element={
-                      <ProtectedRoute>
-                        <Profile />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/category/:category"
-                    element={<CategoryView />}
-                  />
-                  <Route path="/explore" element={<ExploreBlogsPage />} />
-                  <Route
-                    path="/analytics"
-                    element={
-                      <ProtectedRoute>
-                        <Analytics />
-                      </ProtectedRoute>
-                    }
-                  />
-                </Routes>
+          <NotificationsProvider>
+            <Router>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  minHeight: "100vh",
+                }}
+              >
+                <Navbar />
+                <Box component="main" sx={{ flexGrow: 1 }}>
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route
+                      path="/forgot-password"
+                      element={<ForgotPassword />}
+                    />
+                    <Route
+                      path="/reset-password/:token"
+                      element={<ResetPassword />}
+                    />
+                    <Route path="/blog/:id" element={<BlogPost />} />
+                    <Route
+                      path="/write"
+                      element={
+                        <ProtectedRoute>
+                          <CreatePost />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/dashboard"
+                      element={
+                        <ProtectedRoute>
+                          <Dashboard />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/profile"
+                      element={
+                        <ProtectedRoute>
+                          <Profile />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/category/:category"
+                      element={<CategoryView />}
+                    />
+                    <Route path="/explore" element={<ExploreBlogsPage />} />
+                    <Route
+                      path="/analytics"
+                      element={
+                        <ProtectedRoute>
+                          <Analytics />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route path="/user/:userId" element={<UserProfile />} />
+                    <Route path="/search" element={<Search />} />
+                  </Routes>
+                </Box>
+                <Footer />
               </Box>
-              <Footer />
-            </Box>
-          </Router>
+            </Router>
+            <ToastContainer position="bottom-right" />
+          </NotificationsProvider>
         </AuthProvider>
       </ThemeProvider>
     </ColorModeContext.Provider>

@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import axios from "axios";
 
 interface User {
   id: string;
@@ -7,6 +7,9 @@ interface User {
   email: string;
   profilePicture: string;
   role: string;
+  followers: string[];
+  following: string[];
+  postsCount: number;
 }
 
 interface AuthContextType {
@@ -20,30 +23,31 @@ interface AuthContextType {
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (token: string, password: string) => Promise<void>;
   clearError: () => void;
+  updateFollowerCount: (isFollowing: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: "http://localhost:5000/api",
   headers: {
-    'Content-Type': 'application/json'
-  }
+    "Content-Type": "application/json",
+  },
 });
 
 // Add request interceptor for debugging
 api.interceptors.request.use(
   (config) => {
-    console.log('API Request:', {
+    console.log("API Request:", {
       method: config.method,
       url: config.url,
-      data: config.data
+      data: config.data,
     });
     return config;
   },
   (error) => {
-    console.error('API Request Error:', error);
+    console.error("API Request Error:", error);
     return Promise.reject(error);
   }
 );
@@ -51,17 +55,17 @@ api.interceptors.request.use(
 // Add response interceptor for debugging
 api.interceptors.response.use(
   (response) => {
-    console.log('API Response:', {
+    console.log("API Response:", {
       status: response.status,
-      data: response.data
+      data: response.data,
     });
     return response;
   },
   (error) => {
-    console.error('API Response Error:', {
+    console.error("API Response Error:", {
       status: error.response?.status,
       data: error.response?.data,
-      message: error.message
+      message: error.message,
     });
     return Promise.reject(error);
   }
@@ -70,23 +74,27 @@ api.interceptors.response.use(
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
+  const [token, setToken] = useState<string | null>(() =>
+    localStorage.getItem("token")
+  );
 
   // Update axios authorization header when token changes
   useEffect(() => {
     if (token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
     } else {
-      delete api.defaults.headers.common['Authorization'];
+      delete api.defaults.headers.common["Authorization"];
     }
   }, [token]);
 
@@ -94,10 +102,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const loadUser = async () => {
       if (token) {
         try {
-          const res = await api.get('/auth/me');
-          setUser(res.data);
+          const res = await api.get("/auth/me");
+          // Get posts count
+          const statsRes = await api.get("/blogs/dashboard/stats");
+          setUser({
+            ...res.data,
+            postsCount: statsRes.data.totalPosts || 0,
+          });
         } catch (err) {
-          localStorage.removeItem('token');
+          localStorage.removeItem("token");
           setToken(null);
           setUser(null);
         }
@@ -110,25 +123,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     try {
-      console.log('Attempting login with email:', email);
-      const res = await api.post('/auth/login', {
+      console.log("Attempting login with email:", email);
+      const res = await api.post("/auth/login", {
         email,
-        password
+        password,
       });
-      
-      console.log('Login response:', res.data);
+
+      console.log("Login response:", res.data);
       const { token: newToken, user: userData } = res.data;
-      localStorage.setItem('token', newToken);
+      localStorage.setItem("token", newToken);
       setToken(newToken);
       setUser(userData);
       setError(null);
     } catch (err: any) {
-      console.error('Login error details:', {
+      console.error("Login error details:", {
         response: err.response?.data,
         status: err.response?.status,
-        error: err
+        error: err,
       });
-      const errorMessage = err.response?.data?.msg || err.response?.data?.message || 'An error occurred during login';
+      const errorMessage =
+        err.response?.data?.msg ||
+        err.response?.data?.message ||
+        "An error occurred during login";
       setError(errorMessage);
       throw new Error(errorMessage);
     }
@@ -136,44 +152,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (name: string, email: string, password: string) => {
     try {
-      const res = await api.post('/auth/register', {
+      const res = await api.post("/auth/register", {
         name,
         email,
-        password
+        password,
       });
-      
+
       if (!res.data.success) {
-        throw new Error(res.data.message || 'Registration failed');
+        throw new Error(res.data.message || "Registration failed");
       }
-      
+
       const { token: newToken, user: userData } = res.data;
-      localStorage.setItem('token', newToken);
+      localStorage.setItem("token", newToken);
       setToken(newToken);
       setUser(userData);
       setError(null);
     } catch (err: any) {
-      const errorMessage = 
-        err.response?.data?.message || 
-        err.response?.data?.msg || 
-        err.message || 
-        'An error occurred during registration';
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.msg ||
+        err.message ||
+        "An error occurred during registration";
       setError(errorMessage);
       throw new Error(errorMessage);
     }
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem("token");
     setToken(null);
     setUser(null);
   };
 
   const forgotPassword = async (email: string) => {
     try {
-      await api.post('/auth/forgot-password', { email });
+      await api.post("/auth/forgot-password", { email });
       setError(null);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.msg || err.response?.data?.message || 'An error occurred';
+      const errorMessage =
+        err.response?.data?.msg ||
+        err.response?.data?.message ||
+        "An error occurred";
       setError(errorMessage);
       throw new Error(errorMessage);
     }
@@ -184,13 +203,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await api.put(`/auth/reset-password/${token}`, { password });
       setError(null);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.msg || err.response?.data?.message || 'An error occurred';
+      const errorMessage =
+        err.response?.data?.msg ||
+        err.response?.data?.message ||
+        "An error occurred";
       setError(errorMessage);
       throw new Error(errorMessage);
     }
   };
 
   const clearError = () => setError(null);
+
+  const updateFollowerCount = (isFollowing: boolean) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        following: isFollowing
+          ? [...(prev.following || []), user.id]
+          : (prev.following || []).filter((id) => id !== user.id),
+      };
+    });
+  };
 
   return (
     <AuthContext.Provider
@@ -204,10 +238,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         forgotPassword,
         resetPassword,
-        clearError
+        clearError,
+        updateFollowerCount,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
 };
+
+export { AuthContext };

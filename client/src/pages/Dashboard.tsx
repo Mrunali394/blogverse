@@ -16,6 +16,8 @@ import {
   useTheme,
   Skeleton,
   Divider,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import { motion } from "framer-motion";
 import {
@@ -29,10 +31,22 @@ import {
   Edit,
   Favorite,
   Comment,
+  BookmarkBorder,
+  FavoriteBorder,
 } from "@mui/icons-material";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getAllBlogs } from "../services/blogService";
+import {
+  getUserPosts,
+  getUserLikedPosts,
+  getUserBookmarkedPosts,
+  getUserDrafts,
+} from "../services/blogService";
+import {
+  getDashboardStats,
+  getRecentActivity,
+} from "../services/dashboardService";
+import { toast } from "react-toastify";
 import BlogCard from "../components/BlogCard";
 
 interface BlogPost {
@@ -42,6 +56,7 @@ interface BlogPost {
   category: string;
   coverImage?: string;
   createdAt: string;
+  status?: string;
 }
 
 interface Stats {
@@ -52,9 +67,22 @@ interface Stats {
   comments?: number;
 }
 
+interface DashboardStats {
+  totalPosts: number;
+  followers: number;
+  following: number;
+  comments: number;
+  stats: {
+    views: number;
+    likes: number;
+    engagement: number;
+  };
+}
+
 function Dashboard() {
   const theme = useTheme();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Stats>({
@@ -64,60 +92,112 @@ function Dashboard() {
     completedTasks: 0,
     comments: 0,
   });
+  const [activeTab, setActiveTab] = useState(0);
+  const [likedPosts, setLikedPosts] = useState<BlogPost[]>([]);
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<BlogPost[]>([]);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(
+    null
+  );
+  const [draftPosts, setDraftPosts] = useState<BlogPost[]>([]);
+  const [isDraftsLoading, setIsDraftsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchDashboardData = async () => {
       try {
-        const [blogData] = await Promise.all([
-          getAllBlogs(),
-          // getBlogStats() - commented out until backend is ready
-        ]);
-        setPosts(blogData);
-        // Temporarily use mock stats until backend is ready
+        setLoading(true);
+        setError(null);
+
+        const [userPosts, likedData, bookmarkedData, statsData, draftsData] =
+          await Promise.all([
+            getUserPosts(),
+            getUserLikedPosts(),
+            getUserBookmarkedPosts(),
+            getDashboardStats(),
+            getUserDrafts(),
+          ]);
+
+        setPosts(userPosts);
+        setLikedPosts(likedData);
+        setBookmarkedPosts(bookmarkedData);
+        setDashboardStats(statsData);
+        setDraftPosts(draftsData);
+
         setStats({
-          totalPosts: blogData.length,
-          followers: 0,
-          following: 0,
-          completedTasks: 0,
-          comments: 0,
+          totalPosts: statsData.totalPosts,
+          followers: statsData.followers,
+          following: statsData.following,
+          comments: statsData.comments,
         });
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
+      } catch (error: any) {
+        const message =
+          error.response?.data?.message || "Failed to load dashboard data";
+        setError(message);
+        toast.error(message);
       } finally {
         setLoading(false);
+        setIsDraftsLoading(false);
       }
     };
-    fetchData();
+
+    fetchDashboardData();
   }, []);
 
   const statsConfig = [
     {
       title: "Total Posts",
-      value: stats.totalPosts,
+      value: dashboardStats?.totalPosts || 0,
       icon: <Assessment />,
-      color: "#2196f3",
-      trend: "+12%",
+      color: "#0FA4AF",
+      gradient: "linear-gradient(135deg, #0FA4AF 0%, #024950 100%)",
+      trend: `${(dashboardStats?.stats?.engagement || 0).toFixed(1)}%`,
     },
     {
       title: "Following",
-      value: stats.following,
+      value: dashboardStats?.following || 0,
       icon: <Person />,
-      color: "#4caf50",
+      color: "#4CAF50",
+      gradient: "linear-gradient(135deg, #4CAF50 0%, #388E3C 100%)",
       trend: "+5%",
     },
     {
       title: "Followers",
-      value: stats.followers,
+      value: dashboardStats?.followers || 0,
       icon: <Favorite />,
-      color: "#f44336",
+      color: "#FF4081",
+      gradient: "linear-gradient(135deg, #FF4081 0%, #C51162 100%)",
       trend: "+8%",
     },
     {
       title: "Comments",
-      value: stats.comments || 0,
+      value: dashboardStats?.comments || 0,
       icon: <Comment />,
-      color: "#ff9800",
-      trend: "+15%",
+      color: "#7C4DFF",
+      gradient: "linear-gradient(135deg, #7C4DFF 0%, #651FFF 100%)",
+      trend: `+${((dashboardStats?.stats?.engagement || 0) * 100).toFixed(1)}%`,
+    },
+  ];
+
+  const tabContent = [
+    {
+      label: "My Posts",
+      content: posts,
+      loading: loading,
+    },
+    {
+      label: "Drafts",
+      content: draftPosts,
+      loading: isDraftsLoading,
+    },
+    {
+      label: `Liked (${likedPosts.length})`,
+      content: likedPosts,
+      loading: loading,
+    },
+    {
+      label: `Bookmarked (${bookmarkedPosts.length})`,
+      content: bookmarkedPosts,
+      loading: loading,
     },
   ];
 
@@ -151,126 +231,232 @@ function Dashboard() {
     );
   }
 
+  if (error) {
+    return (
+      <Container sx={{ mt: 4, textAlign: "center" }}>
+        <Typography color="error" variant="h6">
+          {error}
+        </Typography>
+        <Button
+          variant="contained"
+          sx={{ mt: 2 }}
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </Button>
+      </Container>
+    );
+  }
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
-      <Box sx={{ mb: 4 }}>
+      {/* Header Section */}
+      <Box sx={{ mb: 6 }}>
         <Typography
           variant="h4"
           gutterBottom
           sx={{
-            fontWeight: 600,
+            fontWeight: 700,
             background: "linear-gradient(45deg, #024950 30%, #0FA4AF 90%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
+            mb: 2,
           }}
         >
           Welcome back, {user?.name || "User"}!
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography
+          variant="subtitle1"
+          color="text.secondary"
+          sx={{
+            fontSize: "1.1rem",
+            maxWidth: 600,
+            lineHeight: 1.6,
+          }}
+        >
           Here's what's happening with your blog today
         </Typography>
       </Box>
 
-      <Grid container spacing={3}>
+      {/* Stats Grid Section */}
+      <Grid container spacing={3} sx={{ mb: 6 }}>
         {statsConfig.map((stat, index) => (
           <Grid item xs={12} sm={6} md={3} key={index}>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: index * 0.1 }}
+              transition={{ duration: 0.4, delay: index * 0.1 }}
             >
               <Paper
-                elevation={2}
+                elevation={0}
                 sx={{
                   p: 3,
-                  borderRadius: 2,
-                  background: `linear-gradient(45deg, ${stat.color}15, ${stat.color}05)`,
-                  transition:
-                    "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+                  height: "100%",
+                  borderRadius: 3,
+                  position: "relative",
+                  overflow: "hidden",
+                  background: stat.gradient,
+                  color: "white",
+                  transition: "all 0.3s ease-in-out",
                   "&:hover": {
                     transform: "translateY(-4px)",
-                    boxShadow: `0 4px 20px ${stat.color}30`,
+                    boxShadow: `0 12px 24px -10px ${stat.color}50`,
+                  },
+                  "&::before": {
+                    content: '""',
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "100%",
+                    background: `radial-gradient(circle at top right, ${stat.color}20, transparent 50%)`,
                   },
                 }}
               >
-                <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                  <Box
-                    sx={{
-                      p: 1,
-                      borderRadius: 2,
-                      bgcolor: `${stat.color}15`,
-                      color: stat.color,
-                    }}
-                  >
-                    {stat.icon}
-                  </Box>
-                  <Box sx={{ ml: "auto" }}>
-                    <Typography
-                      variant="caption"
+                <Box sx={{ position: "relative", zIndex: 1 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                    <Box
                       sx={{
-                        color: "success.main",
-                        bgcolor: "success.light",
-                        px: 1,
-                        py: 0.5,
-                        borderRadius: 1,
+                        p: 1,
+                        borderRadius: 2,
+                        bgcolor: "rgba(255, 255, 255, 0.2)",
+                        backdropFilter: "blur(8px)",
                       }}
                     >
-                      {stat.trend}
-                    </Typography>
+                      {stat.icon}
+                    </Box>
+                    <Box sx={{ ml: "auto" }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 5,
+                          bgcolor: "rgba(255, 255, 255, 0.2)",
+                          backdropFilter: "blur(8px)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {stat.trend}
+                      </Typography>
+                    </Box>
                   </Box>
+                  <Typography
+                    variant="h4"
+                    component="div"
+                    sx={{ mb: 1, fontWeight: 700 }}
+                  >
+                    {stat.value.toLocaleString()}
+                  </Typography>
+                  <Typography sx={{ fontWeight: 500, opacity: 0.9 }}>
+                    {stat.title}
+                  </Typography>
                 </Box>
-                <Typography
-                  variant="h4"
-                  component="div"
-                  sx={{ mb: 1, fontWeight: 600 }}
-                >
-                  {stat.value.toLocaleString()}
-                </Typography>
-                <Typography color="text.secondary" variant="body2">
-                  {stat.title}
-                </Typography>
               </Paper>
             </motion.div>
           </Grid>
         ))}
+      </Grid>
 
+      {/* Tabs Section */}
+      <Box sx={{ mb: 4 }}>
+        <Tabs
+          value={activeTab}
+          onChange={(e, v) => setActiveTab(v)}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            borderBottom: 1,
+            borderColor: "divider",
+            "& .MuiTab-root": {
+              minWidth: 120,
+              fontWeight: 600,
+              fontSize: "0.95rem",
+              textTransform: "none",
+              transition: "all 0.2s ease-in-out",
+              "&:hover": {
+                color: "primary.main",
+                opacity: 1,
+              },
+            },
+            "& .Mui-selected": {
+              color: "primary.main",
+            },
+            "& .MuiTabs-indicator": {
+              height: 3,
+              borderRadius: 1.5,
+              backgroundColor: "primary.main",
+            },
+          }}
+        >
+          {tabContent.map((tab, index) => (
+            <Tab
+              key={index}
+              label={tab.label}
+              sx={{
+                px: 3,
+                py: 2,
+              }}
+            />
+          ))}
+        </Tabs>
+      </Box>
+
+      {/* Content Section */}
+      <Grid container spacing={4}>
         <Grid item xs={12} md={8}>
-          <Card
-            component={motion.div}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            sx={{ borderRadius: 2 }}
-          >
-            <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-                Recent Blog Posts
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
+          {tabContent[activeTab].loading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+            >
               <Grid container spacing={3}>
-                {posts.slice(0, 3).map((post) => (
-                  <Grid item xs={12} sm={6} md={4} key={post._id}>
-                    <BlogCard post={post} />
+                {tabContent[activeTab].content.map((post) => (
+                  <Grid item xs={12} sm={6} key={post._id}>
+                    <BlogCard
+                      post={post}
+                      isDraft={post.status === "draft"}
+                      onEdit={
+                        post.status === "draft"
+                          ? () => navigate(`/edit/${post._id}`)
+                          : undefined
+                      }
+                    />
                   </Grid>
                 ))}
               </Grid>
-            </CardContent>
-          </Card>
+            </motion.div>
+          )}
         </Grid>
 
+        {/* Quick Actions Section */}
         <Grid item xs={12} md={4}>
           <Card
             component={motion.div}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
-            sx={{ borderRadius: 2 }}
+            elevation={0}
+            sx={{
+              borderRadius: 3,
+              border: "1px solid",
+              borderColor: "divider",
+              position: "sticky",
+              top: 24,
+              bgcolor: "background.paper",
+              backdropFilter: "blur(8px)",
+            }}
           >
-            <CardContent>
+            <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
                 Quick Actions
               </Typography>
-              <Divider sx={{ mb: 2 }} />
+              <Divider sx={{ mb: 3 }} />
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <Button
                   variant="contained"
@@ -278,12 +464,19 @@ function Dashboard() {
                   component={Link}
                   to="/write"
                   sx={{
+                    py: 1.5,
+                    px: 3,
+                    borderRadius: 2,
                     background:
                       "linear-gradient(45deg, #024950 30%, #0FA4AF 90%)",
                     color: "white",
+                    fontWeight: 600,
+                    textTransform: "none",
                     "&:hover": {
                       background:
                         "linear-gradient(45deg, #013137 30%, #0C8A96 90%)",
+                      transform: "translateY(-2px)",
+                      boxShadow: "0 8px 16px -4px rgba(15, 164, 175, 0.2)",
                     },
                   }}
                 >
@@ -294,6 +487,13 @@ function Dashboard() {
                   startIcon={<Edit />}
                   component={Link}
                   to="/profile"
+                  sx={{
+                    py: 1.5,
+                    px: 3,
+                    borderRadius: 2,
+                    fontWeight: 600,
+                    textTransform: "none",
+                  }}
                 >
                   Edit Profile
                 </Button>
@@ -302,6 +502,13 @@ function Dashboard() {
                   startIcon={<Analytics />}
                   component={Link}
                   to="/analytics"
+                  sx={{
+                    py: 1.5,
+                    px: 3,
+                    borderRadius: 2,
+                    fontWeight: 600,
+                    textTransform: "none",
+                  }}
                 >
                   View Analytics
                 </Button>

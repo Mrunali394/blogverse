@@ -16,6 +16,7 @@ import {
 } from "@mui/material";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
+import { toast } from "react-toastify";
 
 const categories = [
   "Technology",
@@ -123,6 +124,9 @@ function CreatePost() {
     if (!formData.title.trim()) {
       newErrors.title = "Title is required";
       isValid = false;
+    } else if (formData.title.length < 5) {
+      newErrors.title = "Title must be at least 5 characters long";
+      isValid = false;
     }
 
     if (!formData.category) {
@@ -130,13 +134,37 @@ function CreatePost() {
       isValid = false;
     }
 
-    if (!formData.content.trim()) {
-      newErrors.content = "Content is required";
+    if (
+      !formData.content ||
+      formData.content.replace(/<[^>]*>/g, "").trim().length < 50
+    ) {
+      newErrors.content = "Content must be at least 50 characters long";
+      isValid = false;
+    }
+
+    // Only validate image URL if one is provided
+    if (formData.coverImage && !isValidUrl(formData.coverImage)) {
+      newErrors.coverImage = "Please enter a valid image URL or leave empty";
       isValid = false;
     }
 
     setErrors(newErrors);
     return isValid;
+  };
+
+  const isValidUrl = (url: string) => {
+    try {
+      new URL(url);
+      // Accept more image formats and validate less strictly
+      return (
+        /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/i.test(url) ||
+        /images\.unsplash\.com/i.test(url) ||
+        /cloudinary\.com/i.test(url) ||
+        /imgbb\.com/i.test(url)
+      );
+    } catch {
+      return false;
+    }
   };
 
   const validateDraft = () => {
@@ -165,33 +193,43 @@ function CreatePost() {
     if (validateForm()) {
       try {
         setIsSubmitting(true);
-        const newBlog = await createBlog({
+        const blogData = {
           ...formData,
-          isDraft: false, // Explicitly set to false for published posts
-        });
-        setIsSubmitting(false);
+          isDraft: false, // Explicitly set to false for publishing
+        };
+        const newBlog = await createBlog(blogData);
+        toast.success("Blog post published successfully!");
         navigate(`/blog/${newBlog._id}`);
-      } catch (error) {
+      } catch (error: any) {
+        setSubmitError(
+          error.response?.data?.message || "Failed to publish blog post"
+        );
+        toast.error("Failed to publish blog post");
+      } finally {
         setIsSubmitting(false);
-        setSubmitError("Failed to publish blog post. Please try again.");
-        console.error("Failed to create blog post:", error);
       }
     }
   };
 
   const saveDraft = async (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent form submission
+    e.preventDefault();
+    e.stopPropagation(); // Add this to prevent event bubbling
     setSubmitError("");
 
     if (validateDraft()) {
       try {
         setIsSubmitting(true);
-        const draftBlog = await createBlog({
+        const draftData = {
           ...formData,
-          isDraft: true, // Explicitly set to true for drafts
-        });
-        setIsSubmitting(false);
+          isDraft: true,
+          status: "draft",
+          publishedAt: null,
+        };
 
+        console.log("Saving draft:", draftData); // Add logging
+
+        const draftBlog = await createBlog(draftData);
+        toast.success("Draft saved successfully!");
         navigate("/dashboard", {
           state: {
             notification: "Draft saved successfully!",
@@ -199,10 +237,12 @@ function CreatePost() {
             isDraft: true,
           },
         });
-      } catch (error) {
-        setIsSubmitting(false);
+      } catch (error: any) {
+        console.error("Draft save error:", error); // Add error logging
         setSubmitError("Failed to save draft. Please try again.");
-        console.error("Failed to save draft:", error);
+        toast.error(error.response?.data?.message || "Failed to save draft");
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -245,7 +285,7 @@ function CreatePost() {
               {submitError}
             </Typography>
           )}
-          <Box component="form" onSubmit={handleSubmit}>
+          <Box component="form" onSubmit={handleSubmit} noValidate>
             <TextField
               fullWidth
               label="Post Title"
@@ -382,6 +422,10 @@ function CreatePost() {
                 color="primary"
                 size="large"
                 disabled={isSubmitting}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }}
               >
                 {isSubmitting ? "Publishing..." : "Publish Post"}
               </Button>
@@ -389,7 +433,7 @@ function CreatePost() {
                 variant="outlined"
                 color="secondary"
                 size="large"
-                onClick={saveDraft} // Changed from type="button"
+                onClick={saveDraft}
                 disabled={isSubmitting}
               >
                 {isSubmitting ? "Saving..." : "Save as Draft"}
