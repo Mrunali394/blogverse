@@ -45,6 +45,14 @@ const BlogSchema = new mongoose.Schema({
       },
     },
   ],
+  likesCount: {
+    type: Number,
+    default: 0,
+  },
+  commentsCount: {
+    type: Number,
+    default: 0,
+  },
   coverImage: {
     type: String,
     default: "",
@@ -57,6 +65,10 @@ const BlogSchema = new mongoose.Schema({
     type: String,
     enum: ["draft", "published"],
     default: "published",
+  },
+  publishedAt: {
+    type: Date,
+    default: null,
   },
   date: {
     type: Date,

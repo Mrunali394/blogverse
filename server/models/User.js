@@ -53,6 +53,61 @@ const UserSchema = new mongoose.Schema(
     },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+    followers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    following: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    bookmarks: [
+      {
+        blog: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Blog",
+        },
+        savedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+    notifications: [
+      {
+        type: {
+          type: String,
+          enum: ["follow", "like", "comment", "mention"],
+        },
+        from: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        blog: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Blog",
+        },
+        text: String,
+        read: {
+          type: Boolean,
+          default: false,
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+    emailPreferences: {
+      newFollower: { type: Boolean, default: true },
+      newComment: { type: Boolean, default: true },
+      blogLiked: { type: Boolean, default: true },
+      newsletter: { type: Boolean, default: true },
+    },
   },
   {
     timestamps: true,

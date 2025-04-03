@@ -7,11 +7,23 @@ import {
   Box,
   CardActions,
   Button,
+  IconButton,
 } from "@mui/material";
-import { Article, Edit } from "@mui/icons-material";
+import {
+  Article,
+  Edit,
+  Favorite,
+  Comment,
+  Share,
+  Bookmark,
+} from "@mui/icons-material";
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatDateTime } from "../utils/dateUtils";
+import { likeBlog } from "../services/blogService";
+import { bookmarkBlog } from "../services/userService";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "react-toastify";
 
 interface BlogPost {
   _id: string;
@@ -24,6 +36,9 @@ interface BlogPost {
     _id: string;
     name: string;
   };
+  likesCount?: number;
+  commentsCount?: number;
+  likes?: Array<{ user: string }>;
 }
 
 interface Props {
@@ -33,13 +48,22 @@ interface Props {
 }
 
 function BlogCard({ post, isDraft, onEdit }: Props) {
+  const { user } = useAuth();
   const [imageError, setImageError] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const hasUserLiked = post.likes?.some((like) => like.user === user?._id);
+    setIsLiked(hasUserLiked);
+  }, [post.likes, user?._id]);
 
   const optimizeCloudinaryUrl = (url: string) => {
     if (url && url.includes("cloudinary.com")) {
-      // Add transformation parameters for blog card view
       const imageUrl = new URL(url);
-      const transformationString = "/c_fill,w_400,h_250,q_auto,f_auto";
+      // Use smaller size for card view
+      const transformationString = "/c_fill,w_800,h_450,q_auto,f_auto";
       const pathParts = imageUrl.pathname.split("/");
       const uploadIndex = pathParts.indexOf("upload");
       if (uploadIndex !== -1) {
@@ -60,6 +84,88 @@ function BlogCard({ post, isDraft, onEdit }: Props) {
   const handleImageError = () => {
     setImageError(true);
   };
+
+  const handleLike = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!user) {
+      toast.error("Please login to like posts");
+      return;
+    }
+
+    if (isLoading) return;
+
+    try {
+      setIsLoading(true);
+      const response = await likeBlog(post._id);
+      setIsLiked(!isLiked);
+      post.likesCount = response.likesCount;
+      toast.success(response.liked ? "Post liked!" : "Post unliked");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to like post");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBookmark = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!user) {
+      toast.error("Please login to bookmark posts");
+      return;
+    }
+
+    if (isLoading) return;
+
+    try {
+      setIsLoading(true);
+      await bookmarkBlog(post._id);
+      setIsBookmarked(!isBookmarked);
+      toast.success(
+        isBookmarked ? "Removed from bookmarks" : "Added to bookmarks"
+      );
+    } catch (error: any) {
+      toast.error(error.message || "Failed to bookmark post");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const shareUrl = `${window.location.origin}/blog/${post._id}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: post.title,
+          text: `Check out this post on BlogVerse: ${post.title}`,
+          url: shareUrl,
+        });
+        toast.success("Post shared successfully!");
+      } catch (error) {
+        console.error("Error sharing:", error);
+        handleFallbackShare(shareUrl);
+      }
+    } else {
+      handleFallbackShare(shareUrl);
+    }
+  };
+
+  const handleFallbackShare = (url: string) => {
+    navigator.clipboard.writeText(url);
+    toast.success("Link copied to clipboard!");
+  };
+
+  const getLikesCount = () => post.likesCount || 0;
+  const getCommentsCount = () => post.commentsCount || 0;
+  const getUserName = () => post.user?.name || "Anonymous";
+  const getUserId = () => post.user?._id || "";
 
   return (
     <Card
@@ -222,7 +328,7 @@ function BlogCard({ post, isDraft, onEdit }: Props) {
                 gap: 0.5,
               }}
             >
-              By {post.user.name}
+              By {getUserName()}
             </Typography>
             <Typography
               variant="caption"
@@ -236,6 +342,98 @@ function BlogCard({ post, isDraft, onEdit }: Props) {
           </Box>
         </CardContent>
       </CardActionArea>
+
+      <CardActions
+        sx={{
+          justifyContent: "space-between",
+          px: 2,
+          py: 1,
+          background: (theme) => theme.palette.background.default,
+        }}
+      >
+        <Box sx={{ display: "flex", gap: 2 }}>
+          <IconButton
+            onClick={handleLike}
+            disabled={isLoading || !getUserId()}
+            sx={{
+              color: isLiked ? "error.main" : "action.active",
+              transition: "all 0.2s ease-in-out",
+              "&:hover": {
+                transform: "scale(1.1)",
+                color: "error.main",
+                bgcolor: "error.light",
+              },
+            }}
+          >
+            <Favorite
+              sx={{
+                transform: isLiked ? "scale(1.1)" : "scale(1)",
+                transition: "transform 0.2s ease-in-out",
+              }}
+            />
+            <Typography
+              variant="caption"
+              sx={{
+                ml: 0.5,
+                color: isLiked ? "error.main" : "text.secondary",
+              }}
+            >
+              {getLikesCount()}
+            </Typography>
+          </IconButton>
+
+          <IconButton
+            component={Link}
+            to={`/blog/${post._id}#comments`}
+            sx={{
+              "&:hover": {
+                transform: "scale(1.1)",
+                color: "primary.main",
+                bgcolor: "primary.light",
+              },
+            }}
+          >
+            <Comment />
+            <Typography variant="caption" sx={{ ml: 0.5 }}>
+              {getCommentsCount()}
+            </Typography>
+          </IconButton>
+
+          <IconButton
+            onClick={handleShare}
+            sx={{
+              "&:hover": {
+                transform: "scale(1.1)",
+                color: "secondary.main",
+                bgcolor: "secondary.light",
+              },
+            }}
+          >
+            <Share />
+          </IconButton>
+        </Box>
+
+        <IconButton
+          onClick={handleBookmark}
+          disabled={isLoading}
+          sx={{
+            color: isBookmarked ? "primary.main" : "action.active",
+            transition: "all 0.2s ease-in-out",
+            "&:hover": {
+              transform: "scale(1.1)",
+              color: "primary.main",
+              bgcolor: "primary.light",
+            },
+          }}
+        >
+          <Bookmark
+            sx={{
+              transform: isBookmarked ? "scale(1.1)" : "scale(1)",
+              transition: "transform 0.2s ease-in-out",
+            }}
+          />
+        </IconButton>
+      </CardActions>
 
       {onEdit && isDraft && (
         <CardActions sx={{ p: 2, pt: 0 }}>

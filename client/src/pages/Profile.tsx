@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Container,
   Box,
@@ -12,7 +12,7 @@ import {
   Chip,
   Divider,
   useTheme,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Facebook,
   Twitter,
@@ -20,9 +20,14 @@ import {
   Instagram,
   Edit as EditIcon,
   PhotoCamera,
-} from '@mui/icons-material';
-import { motion } from 'framer-motion';
-import { useAuth } from '../context/AuthContext';
+  Article,
+  Group,
+  PersonAdd,
+} from "@mui/icons-material";
+import { motion } from "framer-motion";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "react-toastify";
+import { updateProfile } from "../api/profile";
 
 interface SocialLink {
   platform: string;
@@ -34,14 +39,36 @@ function Profile() {
   const theme = useTheme();
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [avatar, setAvatar] = useState(user?.profilePicture || '/default-avatar.png');
-  const [bio, setBio] = useState('');
+  const [avatar, setAvatar] = useState(
+    user?.profilePicture || "/default-avatar.png"
+  );
+  const [bio, setBio] = useState("");
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([
-    { platform: 'Facebook', url: '', icon: <Facebook /> },
-    { platform: 'Twitter', url: '', icon: <Twitter /> },
-    { platform: 'LinkedIn', url: '', icon: <LinkedIn /> },
-    { platform: 'Instagram', url: '', icon: <Instagram /> },
+    { platform: "Facebook", url: "", icon: <Facebook /> },
+    { platform: "Twitter", url: "", icon: <Twitter /> },
+    { platform: "LinkedIn", url: "", icon: <LinkedIn /> },
+    { platform: "Instagram", url: "", icon: <Instagram /> },
   ]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  const stats = [
+    {
+      label: "Posts",
+      value: user?.postsCount || 0,
+      icon: <Article sx={{ color: "primary.main", fontSize: 32 }} />,
+    },
+    {
+      label: "Followers",
+      value: user?.followers?.length || 0,
+      icon: <Group sx={{ color: "primary.main", fontSize: 32 }} />,
+    },
+    {
+      label: "Following",
+      value: user?.following?.length || 0,
+      icon: <PersonAdd sx={{ color: "primary.main", fontSize: 32 }} />,
+    },
+  ];
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -55,11 +82,57 @@ function Profile() {
   };
 
   const handleSocialLinkChange = (platform: string, newUrl: string) => {
-    setSocialLinks(prevLinks =>
-      prevLinks.map(link =>
+    setSocialLinks((prevLinks) =>
+      prevLinks.map((link) =>
         link.platform === platform ? { ...link, url: newUrl } : link
       )
     );
+  };
+
+  const handleSave = async () => {
+    if (isLoading) return;
+
+    try {
+      setIsLoading(true);
+      setSaveError("");
+
+      // Validate fields
+      if (bio && bio.length > 500) {
+        throw new Error("Bio cannot exceed 500 characters");
+      }
+
+      // Validate social links
+      for (const link of socialLinks) {
+        if (link.url && !isValidUrl(link.url)) {
+          throw new Error(`Invalid ${link.platform} URL`);
+        }
+      }
+
+      await updateProfile({
+        bio,
+        socialLinks,
+        avatar,
+      });
+
+      setIsEditing(false);
+      toast.success("Profile updated successfully!");
+    } catch (error: any) {
+      setSaveError(
+        error.message || "Failed to update profile. Please try again."
+      );
+      console.error("Profile update error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const isValidUrl = (url: string) => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   return (
@@ -70,23 +143,23 @@ function Profile() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         elevation={2}
-        sx={{ 
-          mt: 4, 
+        sx={{
+          mt: 4,
           p: 4,
           borderRadius: 4,
           background: theme.palette.background.paper,
         }}
       >
-        <Box sx={{ position: 'relative', mb: 4 }}>
+        <Box sx={{ position: "relative", mb: 4 }}>
           <Box
             sx={{
-              display: 'flex',
-              flexDirection: { xs: 'column', md: 'row' },
-              alignItems: 'center',
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              alignItems: "center",
               gap: 4,
             }}
           >
-            <Box sx={{ position: 'relative' }}>
+            <Box sx={{ position: "relative" }}>
               <Avatar
                 src={user?.profilePicture || avatar}
                 sx={{
@@ -101,11 +174,11 @@ function Profile() {
                   aria-label="upload picture"
                   component="label"
                   sx={{
-                    position: 'absolute',
+                    position: "absolute",
                     bottom: 0,
                     right: 0,
                     backgroundColor: theme.palette.background.paper,
-                    '&:hover': { backgroundColor: theme.palette.action.hover },
+                    "&:hover": { backgroundColor: theme.palette.action.hover },
                   }}
                 >
                   <input
@@ -120,43 +193,100 @@ function Profile() {
             </Box>
 
             <Box sx={{ flex: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
                 <Typography variant="h4" component="h1" sx={{ mr: 2 }}>
-                  {user?.name || 'Loading...'}
+                  {user?.name || "Loading..."}
                 </Typography>
                 <Button
                   startIcon={<EditIcon />}
-                  onClick={() => setIsEditing(!isEditing)}
-                  variant={isEditing ? 'contained' : 'outlined'}
+                  onClick={
+                    isEditing ? handleSave : () => setIsEditing(!isEditing)
+                  }
+                  variant={isEditing ? "contained" : "outlined"}
+                  disabled={isLoading}
                 >
-                  {isEditing ? 'Save Profile' : 'Edit Profile'}
+                  {isEditing ? "Save Profile" : "Edit Profile"}
                 </Button>
               </Box>
 
               <Box sx={{ mb: 2 }}>
-                <Chip label={user?.role || 'User'} color="primary" sx={{ mr: 1 }} />
-                <Chip label={user?.email} color="secondary" sx={{ mr: 1 }} />
-                <Chip label="0 Followers" variant="outlined" sx={{ mr: 1 }} />
-                <Chip label="0 Following" variant="outlined" />
-              </Box>
-
-              {isEditing ? (
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  placeholder="Write something about yourself..."
-                  variant="outlined"
+                <Chip
+                  label={user?.role || "User"}
+                  color="primary"
+                  sx={{ mr: 1 }}
                 />
-              ) : (
-                <Typography color="text.secondary">
-                  {bio || 'No bio added yet.'}
-                </Typography>
-              )}
+                <Chip label={user?.email} color="secondary" sx={{ mr: 1 }} />
+              </Box>
             </Box>
           </Box>
+        </Box>
+
+        {/* Enhanced Stats Display */}
+        <Grid container spacing={3} sx={{ mt: 4, mb: 4 }}>
+          {stats.map((stat) => (
+            <Grid item xs={12} sm={4} key={stat.label}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 3,
+                  height: "100%",
+                  textAlign: "center",
+                  borderRadius: 2,
+                  bgcolor: "background.default",
+                  transition: "transform 0.2s ease-in-out",
+                  "&:hover": {
+                    transform: "translateY(-4px)",
+                    boxShadow: (theme) =>
+                      `0 4px 20px ${theme.palette.primary.main}25`,
+                  },
+                }}
+              >
+                <Box sx={{ mb: 2 }}>{stat.icon}</Box>
+                <Typography
+                  variant="h4"
+                  color="primary"
+                  sx={{ fontWeight: 700, mb: 1 }}
+                >
+                  {stat.value.toLocaleString()}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {stat.label}
+                </Typography>
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
+
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+            About Me
+          </Typography>
+          {isEditing ? (
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="Write something about yourself..."
+              variant="outlined"
+              error={!!saveError}
+              helperText={saveError}
+            />
+          ) : (
+            <Typography
+              variant="body1"
+              color="text.secondary"
+              sx={{
+                p: 2,
+                borderRadius: 1,
+                bgcolor: "background.default",
+                minHeight: "100px",
+              }}
+            >
+              {bio || "No bio added yet."}
+            </Typography>
+          )}
         </Box>
 
         <Divider sx={{ my: 4 }} />
@@ -178,7 +308,7 @@ function Profile() {
                     }
                     InputProps={{
                       startAdornment: (
-                        <Box sx={{ mr: 1, color: 'text.secondary' }}>
+                        <Box sx={{ mr: 1, color: "text.secondary" }}>
                           {link.icon}
                         </Box>
                       ),
@@ -192,7 +322,7 @@ function Profile() {
                     target="_blank"
                     disabled={!link.url}
                     variant="outlined"
-                    sx={{ justifyContent: 'flex-start' }}
+                    sx={{ justifyContent: "flex-start" }}
                   >
                     {link.platform}
                   </Button>
