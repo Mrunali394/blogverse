@@ -53,10 +53,14 @@ interface SearchResultItem {
 
 const Search = styled("div")(({ theme }) => ({
   position: "relative",
-  borderRadius: theme.shape.borderRadius,
-  backgroundColor: alpha(theme.palette.common.white, 0.15),
+  borderRadius: theme.shape.borderRadius * 2,
+  backgroundColor: alpha(theme.palette.common.white, 0.08),
+  backdropFilter: "blur(8px)",
+  transition: "all 0.3s ease",
   "&:hover": {
-    backgroundColor: alpha(theme.palette.common.white, 0.25),
+    backgroundColor: alpha(theme.palette.common.white, 0.15),
+    transform: "translateY(-1px)",
+    boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.15)}`,
   },
   marginRight: theme.spacing(2),
   marginLeft: 0,
@@ -93,6 +97,18 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
   },
 }));
 
+const UserProfileBox = styled(Box)(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  padding: theme.spacing(0.5, 1.5),
+  borderRadius: 24,
+  cursor: "pointer",
+  transition: "all 0.2s",
+  "&:hover": {
+    backgroundColor: alpha(theme.palette.common.white, 0.1),
+  },
+}));
+
 const categories = [
   { id: 1, name: "Technology", icon: "🚀", color: "#1A237E" },
   { id: 2, name: "Design", icon: "🎨", color: "#B71C1C" },
@@ -112,6 +128,7 @@ function Navbar() {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const { user, logout } = useAuth();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [categoryAnchorEl, setCategoryAnchorEl] = useState<null | HTMLElement>(
@@ -210,7 +227,7 @@ function Navbar() {
     if (result.type === "blog") {
       navigate(`/blog/${result._id}`);
     } else {
-      navigate(`/user/${result._id}`); // Changed from /profile/ to /user/
+      navigate(`/user/${result._id}`);
     }
   };
 
@@ -234,7 +251,7 @@ function Navbar() {
     ...(user
       ? [
           { text: "Dashboard", icon: <DashboardIcon />, to: "/dashboard" },
-          { text: "Profile", icon: <PersonIcon />, to: `/user/${user._id}` }, // Changed from /profile to /user/:id
+          { text: "Profile", icon: <PersonIcon />, to: `/user/${user._id}` },
           { text: "Logout", icon: <LogoutIcon />, onClick: handleLogout },
         ]
       : [
@@ -244,7 +261,16 @@ function Navbar() {
   ];
 
   return (
-    <AppBar position="sticky" color="default" elevation={1}>
+    <AppBar
+      position="sticky"
+      color="default"
+      elevation={0}
+      sx={{
+        backdropFilter: "blur(8px)",
+        backgroundColor: alpha(theme.palette.background.default, 0.8),
+        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+      }}
+    >
       <Container maxWidth="lg">
         <Toolbar
           disableGutters
@@ -252,6 +278,7 @@ function Navbar() {
             display: "flex",
             justifyContent: "space-between",
             flexWrap: "nowrap",
+            py: 1,
           }}
         >
           {/* Mobile Menu Icon */}
@@ -300,14 +327,19 @@ function Navbar() {
                 <Button
                   startIcon={<CategoryIcon />}
                   endIcon={<KeyboardArrowDown />}
-                  onClick={(e) => setCategoriesAnchor(e.currentTarget)}
                   sx={{
-                    color: "inherit",
+                    color: "text.primary",
                     textTransform: "none",
+                    px: 2,
+                    py: 1,
+                    borderRadius: 2,
+                    transition: "all 0.2s ease",
                     "&:hover": {
-                      backgroundColor: alpha(theme.palette.common.white, 0.1),
+                      backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                      transform: "translateY(-1px)",
                     },
                   }}
+                  onClick={(e) => setCategoriesAnchor(e.currentTarget)}
                 >
                   Categories
                 </Button>
@@ -472,29 +504,65 @@ function Navbar() {
                       to="/write"
                       startIcon={<EditIcon />}
                       sx={{
-                        color: "inherit",
+                        color: "text.primary",
                         textTransform: "none",
+                        px: 2,
+                        py: 1,
+                        borderRadius: 2,
+                        transition: "all 0.2s ease",
                         "&:hover": {
                           backgroundColor: alpha(
-                            theme.palette.common.white,
-                            0.1
+                            theme.palette.primary.main,
+                            0.08
                           ),
+                          transform: "translateY(-1px)",
                         },
                       }}
                     >
                       Write
                     </Button>
-                    <IconButton
+
+                    {/* Updated User Profile Section with Name and Avatar */}
+                    <UserProfileBox
                       onClick={handleProfileMenuOpen}
-                      size="small"
-                      sx={{ ml: 2 }}
+                      sx={{
+                        transition: "all 0.2s ease",
+                        "&:hover": {
+                          transform: "translateY(-1px)",
+                          backgroundColor: alpha(
+                            theme.palette.primary.main,
+                            0.08
+                          ),
+                        },
+                      }}
                     >
                       <Avatar
                         alt={user.name}
                         src={user.profilePicture}
-                        sx={{ width: 32, height: 32 }}
+                        sx={{
+                          width: 32,
+                          height: 32,
+                          border: `2px solid ${theme.palette.primary.main}`,
+                          transition: "transform 0.2s",
+                          "&:hover": {
+                            transform: "scale(1.05)",
+                          },
+                        }}
                       />
-                    </IconButton>
+                      {!isSmallScreen && (
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 500,
+                            ml: 1,
+                            color: "text.primary",
+                          }}
+                        >
+                          {user.name}
+                        </Typography>
+                      )}
+                    </UserProfileBox>
+
                     <Menu
                       anchorEl={anchorEl}
                       open={Boolean(anchorEl)}
@@ -537,7 +605,7 @@ function Navbar() {
                       </MenuItem>
                       <MenuItem
                         component={Link}
-                        to={`/user/${user._id}`} // Changed from /profile to /user/:id
+                        to={`/user/${user._id}`}
                         onClick={handleMenuClose}
                         sx={{
                           display: "flex",
@@ -585,13 +653,18 @@ function Navbar() {
                       component={Link}
                       to="/login"
                       sx={{
-                        color: "inherit",
+                        color: "text.primary",
                         textTransform: "none",
+                        px: 3,
+                        py: 1,
+                        borderRadius: 2,
+                        transition: "all 0.2s ease",
                         "&:hover": {
                           backgroundColor: alpha(
-                            theme.palette.common.white,
-                            0.1
+                            theme.palette.primary.main,
+                            0.08
                           ),
+                          transform: "translateY(-1px)",
                         },
                       }}
                     >
@@ -603,11 +676,20 @@ function Navbar() {
                       variant="contained"
                       sx={{
                         textTransform: "none",
+                        px: 3,
+                        py: 1,
+                        borderRadius: 2,
                         background:
                           "linear-gradient(135deg, #0FA4AF 0%, #AFDDE5 100%)",
+                        transition: "all 0.2s ease",
                         "&:hover": {
                           background:
                             "linear-gradient(135deg, #024950 0%, #0FA4AF 100%)",
+                          transform: "translateY(-1px)",
+                          boxShadow: `0 4px 20px ${alpha(
+                            theme.palette.primary.main,
+                            0.3
+                          )}`,
                         },
                       }}
                     >

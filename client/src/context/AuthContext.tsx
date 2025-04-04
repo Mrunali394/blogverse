@@ -18,12 +18,13 @@ interface AuthContextType {
   error: string | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (formData: FormData) => Promise<void>;
   logout: () => void;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (token: string, password: string) => Promise<void>;
   clearError: () => void;
   updateFollowerCount: (isFollowing: boolean) => void;
+  updateUser: (userData: any) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -150,12 +151,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (formData: FormData) => {
     try {
-      const res = await api.post("/auth/register", {
-        name,
-        email,
-        password,
+      const res = await api.post("/auth/register", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       });
 
       if (!res.data.success) {
@@ -226,6 +227,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
 
+  const updateUser = (userData: any) => {
+    setUser(userData);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -240,6 +245,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         resetPassword,
         clearError,
         updateFollowerCount,
+        updateUser,
       }}
     >
       {children}

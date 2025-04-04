@@ -260,35 +260,95 @@ router.get("/drafts", auth, async (req, res) => {
 router.post("/", auth, async (req, res) => {
   try {
     const { title, content, category, coverImage, isDraft } = req.body;
-    console.log("Received blog data:", { isDraft, title }); // Add logging
+    const MAX_CONTENT_LENGTH = 100000; // 100KB limit
+    const MAX_TITLE_LENGTH = 200;
 
-    const newBlog = new Blog({
-      title,
-      content,
+    // Debug logging
+    console.log("Received blog creation request:", {
+      titleLength: title?.length,
+      contentLength: content?.length,
       category,
-      coverImage,
-      isDraft: Boolean(isDraft), // Ensure boolean conversion
-      status: Boolean(isDraft) ? "draft" : "published",
-      publishedAt: Boolean(isDraft) ? null : new Date(),
-      user: req.user.id,
+      isDraft,
+      userId: req.user.id,
     });
 
-    console.log("Creating blog with:", {
-      isDraft: newBlog.isDraft,
-      status: newBlog.status,
-    }); // Add logging
+    // Content length validation first
+    if (content && content.length > MAX_CONTENT_LENGTH) {
+      return res.status(400).json({
+        message: `Content exceeds maximum length of ${MAX_CONTENT_LENGTH} characters`,
+        currentLength: content.length,
+        maxLength: MAX_CONTENT_LENGTH,
+        code: "CONTENT_TOO_LONG",
+      });
+    }
 
-    const blog = await newBlog.save();
-    const populatedBlog = await Blog.findById(blog._id).populate(
-      "user",
-      "name"
-    );
-    res.json(populatedBlog);
+    // Enhanced input validation
+    if (!title?.trim()) {
+      return res.status(400).json({ message: "Title is required" });
+    }
+
+    if (title.length < 5) {
+      return res
+        .status(400)
+        .json({ message: "Title must be at least 5 characters long" });
+    }
+
+    if (title.length > MAX_TITLE_LENGTH) {
+      return res.status(400).json({
+        message: `Title must be less than ${MAX_TITLE_LENGTH} characters`,
+      });
+    }
+
+    if (!category?.trim()) {
+      return res.status(400).json({ message: "Category is required" });
+    }
+
+    if (!content) {
+      return res.status(400).json({ message: "Content is required" });
+    }
+
+    const textContent = content.replace(/<[^>]*>/g, "").trim();
+    if (textContent.length < 50) {
+      return res.status(400).json({
+        message: "Content must be at least 50 characters long",
+        currentLength: textContent.length,
+      });
+    }
+
+    // Create and save blog with enhanced error handling
+    try {
+      const newBlog = new Blog({
+        title: title.trim(),
+        content: content.trim(),
+        category: category.trim(),
+        coverImage: coverImage?.trim() || "",
+        isDraft: Boolean(isDraft),
+        status: Boolean(isDraft) ? "draft" : "published",
+        publishedAt: Boolean(isDraft) ? null : new Date(),
+        user: req.user.id,
+      });
+
+      const blog = await newBlog.save();
+      const populatedBlog = await Blog.findById(blog._id).populate(
+        "user",
+        "name"
+      );
+
+      res.status(201).json(populatedBlog);
+    } catch (saveError) {
+      console.error("Blog save error:", saveError);
+      return res.status(400).json({
+        message: saveError.message || "Error saving blog to database",
+        error: saveError.message,
+        code: "SAVE_ERROR",
+      });
+    }
   } catch (err) {
     console.error("Blog creation error:", err);
     res.status(500).json({
       message: "Error creating blog post",
       error: err.message,
+      code: "SERVER_ERROR",
     });
   }
 });

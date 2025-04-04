@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Container,
   Box,
@@ -23,36 +23,143 @@ import {
   Article,
   Group,
   PersonAdd,
+  Language,
 } from "@mui/icons-material";
 import { motion } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
 import { updateProfile } from "../api/profile";
 import FollowersListDialog from "../components/FollowersListDialog";
+import { alpha } from "@mui/material/styles";
 
 interface SocialLink {
   platform: string;
   url: string;
   icon: JSX.Element;
+  pattern: string;
+  placeholder: string;
+  label?: string;
+  isValid?: boolean;
 }
+
+const validateSocialUrl = (url: string, pattern: string): boolean => {
+  if (!url) return true;
+  try {
+    // Add https:// if no protocol is specified
+    const urlWithProtocol = url.match(/^https?:\/\//) ? url : `https://${url}`;
+    const regex = new RegExp(pattern);
+    return regex.test(urlWithProtocol);
+  } catch {
+    return false;
+  }
+};
 
 function Profile() {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [avatar, setAvatar] = useState(
-    user?.profilePicture || "/default-avatar.png"
-  );
-  const [bio, setBio] = useState("");
-  const [socialLinks, setSocialLinks] = useState<SocialLink[]>([
-    { platform: "Facebook", url: "", icon: <Facebook /> },
-    { platform: "Twitter", url: "", icon: <Twitter /> },
-    { platform: "LinkedIn", url: "", icon: <LinkedIn /> },
-    { platform: "Instagram", url: "", icon: <Instagram /> },
-  ]);
+  const [profileData, setProfileData] = useState({
+    name: user?.name || "",
+    bio: user?.bio || "",
+    profilePicture: user?.profilePicture || "/default-avatar.png",
+    socialLinks: [
+      {
+        platform: "Website",
+        url: user?.socialLinks?.website || "",
+        icon: <Language />,
+        // Updated pattern to be more permissive for website URLs
+        pattern:
+          "^(https?://)?(([\\w-]+\\.)+[\\w-]{2,}|localhost)(:\\d+)?(/.*)?$",
+        placeholder: "example.com or sub.example.com",
+        label: "Personal Website",
+      },
+      {
+        platform: "Facebook",
+        url: user?.socialLinks?.facebook || "",
+        icon: <Facebook />,
+        pattern: "^(https?://)?(www\\.)?facebook\\.com/.*$",
+        placeholder: "https://facebook.com/yourprofile",
+      },
+      {
+        platform: "Twitter",
+        url: user?.socialLinks?.twitter || "",
+        icon: <Twitter />,
+        pattern: "^(https?://)?(www\\.)?twitter\\.com/.*$",
+        placeholder: "https://twitter.com/yourhandle",
+      },
+      {
+        platform: "LinkedIn",
+        url: user?.socialLinks?.linkedin || "",
+        icon: <LinkedIn />,
+        pattern: "^(https?://)?(www\\.)?linkedin\\.com/.*$",
+        placeholder: "https://linkedin.com/in/yourprofile",
+      },
+      {
+        platform: "Instagram",
+        url: user?.socialLinks?.instagram || "",
+        icon: <Instagram />,
+        pattern: "^(https?://)?(www\\.)?instagram\\.com/.*$",
+        placeholder: "https://instagram.com/yourhandle",
+      },
+    ],
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [openDialog, setOpenDialog] = useState<"followers" | "following" | null>(null);
+  const [openDialog, setOpenDialog] = useState<
+    "followers" | "following" | null
+  >(null);
+  const [profilePicture, setProfilePicture] = useState<File | null>(null);
+
+  // Initialize profile data when user data is loaded
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        name: user.name || "",
+        bio: user.bio || "",
+        profilePicture: user.profilePicture || "/default-avatar.png",
+        socialLinks: [
+          {
+            platform: "Website",
+            url: user.socialLinks?.website || "",
+            icon: <Language />,
+            // Updated pattern to be more permissive for website URLs
+            pattern:
+              "^(https?://)?(([\\w-]+\\.)+[\\w-]{2,}|localhost)(:\\d+)?(/.*)?$",
+            placeholder: "example.com or sub.example.com",
+            label: "Personal Website",
+          },
+          {
+            platform: "Facebook",
+            url: user.socialLinks?.facebook || "",
+            icon: <Facebook />,
+            pattern: "^(https?://)?(www\\.)?facebook\\.com/.*$",
+            placeholder: "https://facebook.com/yourprofile",
+          },
+          {
+            platform: "Twitter",
+            url: user.socialLinks?.twitter || "",
+            icon: <Twitter />,
+            pattern: "^(https?://)?(www\\.)?twitter\\.com/.*$",
+            placeholder: "https://twitter.com/yourhandle",
+          },
+          {
+            platform: "LinkedIn",
+            url: user.socialLinks?.linkedin || "",
+            icon: <LinkedIn />,
+            pattern: "^(https?://)?(www\\.)?linkedin\\.com/.*$",
+            placeholder: "https://linkedin.com/in/yourprofile",
+          },
+          {
+            platform: "Instagram",
+            url: user.socialLinks?.instagram || "",
+            icon: <Instagram />,
+            pattern: "^(https?://)?(www\\.)?instagram\\.com/.*$",
+            placeholder: "https://instagram.com/yourhandle",
+          },
+        ],
+      });
+    }
+  }, [user]);
 
   const handleDialogClose = () => {
     setOpenDialog(null);
@@ -85,20 +192,30 @@ function Profile() {
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatar(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setProfileData((prevData) => ({
+        ...prevData,
+        profilePicture: previewUrl,
+      }));
+      // Store file for upload
+      setProfilePicture(file);
     }
   };
 
   const handleSocialLinkChange = (platform: string, newUrl: string) => {
-    setSocialLinks((prevLinks) =>
-      prevLinks.map((link) =>
-        link.platform === platform ? { ...link, url: newUrl } : link
-      )
-    );
+    setProfileData((prevData) => ({
+      ...prevData,
+      socialLinks: prevData.socialLinks.map((link) =>
+        link.platform === platform
+          ? {
+              ...link,
+              url: newUrl.trim(),
+              isValid: validateSocialUrl(newUrl.trim(), link.pattern),
+            }
+          : link
+      ),
+    }));
   };
 
   const handleSave = async () => {
@@ -108,42 +225,68 @@ function Profile() {
       setIsLoading(true);
       setSaveError("");
 
-      // Validate fields
-      if (bio && bio.length > 500) {
+      if (profileData.bio && profileData.bio.length > 500) {
         throw new Error("Bio cannot exceed 500 characters");
       }
 
-      // Validate social links
-      for (const link of socialLinks) {
-        if (link.url && !isValidUrl(link.url)) {
-          throw new Error(`Invalid ${link.platform} URL`);
+      // Transform social links
+      const socialLinks = {};
+      for (const link of profileData.socialLinks) {
+        if (link.url) {
+          // Add https:// if no protocol is specified
+          const urlWithProtocol = link.url.match(/^https?:\/\//)
+            ? link.url
+            : `https://${link.url}`;
+
+          if (!validateSocialUrl(urlWithProtocol, link.pattern)) {
+            throw new Error(`Invalid ${link.platform} URL`);
+          }
+
+          // Handle website field correctly
+          const platformKey = link.platform.toLowerCase();
+          socialLinks[platformKey === "website" ? "website" : platformKey] =
+            urlWithProtocol;
         }
       }
 
-      await updateProfile({
-        bio,
+      const updateData = {
+        bio: profileData.bio,
         socialLinks,
-        avatar,
-      });
+        profilePicture: profilePicture || undefined,
+      };
 
-      setIsEditing(false);
-      toast.success("Profile updated successfully!");
+      console.log("Sending update data:", updateData);
+      const response = await updateProfile(updateData);
+
+      if (response.success) {
+        // Clean up preview URL
+        if (profilePicture) {
+          URL.revokeObjectURL(profileData.profilePicture);
+        }
+        updateUser(response.user);
+        setIsEditing(false);
+        setProfilePicture(null);
+        toast.success("Profile updated successfully!");
+      }
     } catch (error: any) {
-      setSaveError(
-        error.message || "Failed to update profile. Please try again."
-      );
-      console.error("Profile update error:", error);
+      const errorMessage =
+        error.message || "Failed to update profile. Please try again.";
+      setSaveError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const isValidUrl = (url: string) => {
+  const handleLinkClick = (url: string, platform: string) => {
+    if (!url) return;
+
     try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
+      // Ensure URL has protocol
+      const finalUrl = url.match(/^https?:\/\//) ? url : `https://${url}`;
+      window.open(finalUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      toast.error(`Failed to open ${platform} link. Please check the URL.`);
     }
   };
 
@@ -162,6 +305,19 @@ function Profile() {
           background: theme.palette.background.paper,
         }}
       >
+        <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
+          <Typography variant="h4" component="h1">
+            My Profile
+          </Typography>
+          <Button
+            startIcon={isEditing ? null : <EditIcon />}
+            onClick={isEditing ? handleSave : () => setIsEditing(true)}
+            variant={isEditing ? "contained" : "outlined"}
+            disabled={isLoading}
+          >
+            {isEditing ? "Save Changes" : "Edit Profile"}
+          </Button>
+        </Box>
         <Box sx={{ position: "relative", mb: 4 }}>
           <Box
             sx={{
@@ -173,7 +329,7 @@ function Profile() {
           >
             <Box sx={{ position: "relative" }}>
               <Avatar
-                src={user?.profilePicture || avatar}
+                src={profileData.profilePicture}
                 sx={{
                   width: 150,
                   height: 150,
@@ -203,22 +359,11 @@ function Profile() {
                 </IconButton>
               )}
             </Box>
-
             <Box sx={{ flex: 1 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
                 <Typography variant="h4" component="h1" sx={{ mr: 2 }}>
-                  {user?.name || "Loading..."}
+                  {profileData.name || "Loading..."}
                 </Typography>
-                <Button
-                  startIcon={<EditIcon />}
-                  onClick={
-                    isEditing ? handleSave : () => setIsEditing(!isEditing)
-                  }
-                  variant={isEditing ? "contained" : "outlined"}
-                  disabled={isLoading}
-                >
-                  {isEditing ? "Save Profile" : "Edit Profile"}
-                </Button>
               </Box>
 
               <Box sx={{ mb: 2 }}>
@@ -232,7 +377,6 @@ function Profile() {
             </Box>
           </Box>
         </Box>
-
         {/* Enhanced Stats Display */}
         <Grid container spacing={3} sx={{ mt: 4, mb: 4 }}>
           {stats.map((stat) => (
@@ -251,7 +395,9 @@ function Profile() {
                   "&:hover": {
                     transform: stat.onClick ? "translateY(-4px)" : "none",
                     boxShadow: (theme) =>
-                      stat.onClick ? `0 4px 20px ${theme.palette.primary.main}25` : "none",
+                      stat.onClick
+                        ? `0 4px 20px ${theme.palette.primary.main}25`
+                        : "none",
                   },
                 }}
               >
@@ -270,6 +416,7 @@ function Profile() {
             </Grid>
           ))}
         </Grid>
+        <Divider sx={{ my: 4 }} />
 
         <Box sx={{ mb: 4 }}>
           <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
@@ -280,8 +427,13 @@ function Profile() {
               fullWidth
               multiline
               rows={4}
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
+              value={profileData.bio}
+              onChange={(e) =>
+                setProfileData((prevData) => ({
+                  ...prevData,
+                  bio: e.target.value,
+                }))
+              }
               placeholder="Write something about yourself..."
               variant="outlined"
               error={!!saveError}
@@ -298,47 +450,92 @@ function Profile() {
                 minHeight: "100px",
               }}
             >
-              {bio || "No bio added yet."}
+              {profileData.bio || "No bio added yet."}
             </Typography>
           )}
         </Box>
-
         <Divider sx={{ my: 4 }} />
 
         <Box>
-          <Typography variant="h6" sx={{ mb: 3 }}>
+          <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
             Social Links
           </Typography>
-          <Grid container spacing={2}>
-            {socialLinks.map((link) => (
+          <Grid container spacing={3}>
+            {profileData.socialLinks.map((link) => (
               <Grid item xs={12} sm={6} key={link.platform}>
                 {isEditing ? (
                   <TextField
                     fullWidth
-                    label={link.platform}
+                    label={link.label || link.platform}
                     value={link.url}
                     onChange={(e) =>
                       handleSocialLinkChange(link.platform, e.target.value)
                     }
+                    placeholder={link.placeholder}
+                    error={
+                      !!link.url && !validateSocialUrl(link.url, link.pattern)
+                    }
+                    helperText={
+                      link.url && !validateSocialUrl(link.url, link.pattern)
+                        ? `Please enter a valid ${link.platform} URL`
+                        : `Enter your ${link.platform} profile URL`
+                    }
                     InputProps={{
                       startAdornment: (
-                        <Box sx={{ mr: 1, color: "text.secondary" }}>
+                        <Box
+                          sx={{
+                            mr: 1,
+                            color: link.url ? "primary.main" : "text.secondary",
+                          }}
+                        >
                           {link.icon}
                         </Box>
                       ),
+                    }}
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        "&.Mui-focused": {
+                          "& .MuiOutlinedInput-notchedOutline": {
+                            borderColor:
+                              link.url &&
+                              validateSocialUrl(link.url, link.pattern)
+                                ? "success.main"
+                                : undefined,
+                          },
+                        },
+                      },
                     }}
                   />
                 ) : (
                   <Button
                     fullWidth
-                    startIcon={link.icon}
-                    href={link.url}
-                    target="_blank"
-                    disabled={!link.url}
                     variant="outlined"
-                    sx={{ justifyContent: "flex-start" }}
+                    disabled={!link.url}
+                    onClick={() => handleLinkClick(link.url, link.platform)}
+                    startIcon={link.icon}
+                    sx={{
+                      justifyContent: "flex-start",
+                      py: 1.5,
+                      opacity: link.url ? 1 : 0.6, // Add opacity for disabled state
+                      backgroundColor:
+                        theme.palette.mode === "dark"
+                          ? alpha(theme.palette.primary.main, 0.1)
+                          : alpha(theme.palette.primary.main, 0.05),
+                      "&:hover": {
+                        backgroundColor: alpha(
+                          theme.palette.primary.main,
+                          0.15
+                        ),
+                        transform: link.url ? "translateY(-2px)" : "none", // Only add hover effect if URL exists
+                        transition: "transform 0.2s ease-in-out",
+                      },
+                      "& .MuiButton-startIcon": {
+                        color: link.url ? "primary.main" : "text.secondary", // Change icon color based on URL existence
+                      },
+                      cursor: link.url ? "pointer" : "default", // Change cursor based on URL existence
+                    }}
                   >
-                    {link.platform}
+                    {link.url || `Add ${link.platform}`}
                   </Button>
                 )}
               </Grid>
@@ -346,12 +543,11 @@ function Profile() {
           </Grid>
         </Box>
       </Paper>
-
       <FollowersListDialog
-        open={!!openDialog}
-        onClose={handleDialogClose}
-        userId={user?._id || ""}
         type={openDialog || "followers"}
+        userId={user?._id || ""}
+        onClose={handleDialogClose}
+        open={!!openDialog}
       />
     </Container>
   );

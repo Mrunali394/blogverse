@@ -203,13 +203,14 @@ function App() {
                       }
                     />
                     <Route
-                      path="/profile"
+                      path="/me"
                       element={
                         <ProtectedRoute>
                           <Profile />
                         </ProtectedRoute>
                       }
                     />
+                    <Route path="/profile/:userId" element={<UserProfile />} />
                     <Route
                       path="/category/:category"
                       element={<CategoryView />}

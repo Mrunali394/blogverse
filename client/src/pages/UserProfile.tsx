@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Container,
   Grid,
@@ -16,6 +16,7 @@ import {
 } from "@mui/material";
 import { TrendingUp, Visibility, Article, Schedule } from "@mui/icons-material";
 import { getUserProfile } from "../services/userService";
+import { useAuth } from "../context/AuthContext";
 import UserProfileCard from "../components/UserProfileCard";
 import BlogCard from "../components/BlogCard";
 
@@ -62,6 +63,8 @@ const PROFILE_STATS = [
 function UserProfile() {
   const theme = useTheme();
   const { userId } = useParams();
+  const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -78,6 +81,12 @@ function UserProfile() {
         blog.user
     );
   };
+
+  useEffect(() => {
+    if (currentUser?._id === userId) {
+      navigate("/me");
+    }
+  }, [currentUser, userId, navigate]);
 
   useEffect(() => {
     const fetchProfile = async () => {
