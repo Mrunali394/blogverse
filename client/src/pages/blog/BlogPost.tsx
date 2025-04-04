@@ -11,11 +11,22 @@ import {
   Divider,
 } from "@mui/material";
 import { useParams, Link } from "react-router-dom";
-import { getBlog, addComment } from "../../services/blogService";
+import { getBlog, addComment, addReply } from "../../services/blogService";
 import { formatDateTime } from "../../utils/dateUtils";
 import { useAuth } from "../../context/AuthContext";
 import { toast } from "react-toastify";
 import { Person } from "@mui/icons-material";
+
+interface Reply {
+  _id: string;
+  text: string;
+  user: {
+    _id: string;
+    name: string;
+    profilePicture?: string;
+  };
+  date: string;
+}
 
 interface Comment {
   _id: string;
@@ -23,8 +34,10 @@ interface Comment {
   user: {
     _id: string;
     name: string;
+    profilePicture?: string;
   };
   date: string;
+  replies: Reply[];
 }
 
 interface BlogPost {
@@ -40,7 +53,7 @@ interface BlogPost {
     profilePicture?: string;
   };
   comments: Comment[];
-  commentsCount: number; // Add this field
+  commentsCount: number;
 }
 
 function BlogPost() {
@@ -51,6 +64,8 @@ function BlogPost() {
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [commentError, setCommentError] = useState("");
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
   const { user } = useAuth();
 
   const optimizeCloudinaryUrl = (url: string) => {
@@ -130,7 +145,6 @@ function BlogPost() {
         setComment("");
         toast.success("Comment added successfully!");
 
-        // Scroll to the latest comment
         const commentsSection = document.getElementById("comments");
         commentsSection?.scrollIntoView({ behavior: "smooth" });
       }
@@ -138,6 +152,36 @@ function BlogPost() {
       const errorMsg = error.response?.data?.message || "Failed to add comment";
       setCommentError(errorMsg);
       toast.error(errorMsg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReplySubmit = async (commentId: string) => {
+    if (!user) {
+      toast.error("Please login to reply");
+      return;
+    }
+
+    if (!validateComment(replyText)) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const response = await addReply(id!, commentId, replyText);
+      setPost((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          comments: response,
+        };
+      });
+      setReplyText("");
+      setReplyingTo(null);
+      toast.success("Reply added successfully!");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add reply");
     } finally {
       setIsSubmitting(false);
     }
@@ -197,7 +241,6 @@ function BlogPost() {
             {post.title}
           </Typography>
 
-          {/* Add User Profile Section */}
           <Box
             sx={{
               display: "flex",
@@ -255,31 +298,177 @@ function BlogPost() {
               Comments ({post?.commentsCount || 0})
             </Typography>
 
-            {/* Show existing comments to everyone */}
-            {post?.comments?.map((comment) => (
-              <Box key={comment._id} sx={{ mb: 3 }}>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                  <Avatar sx={{ mr: 2 }}>
-                    {comment.user?.name
-                      ? comment.user.name[0].toUpperCase()
-                      : "?"}
-                  </Avatar>
-                  <Box>
-                    <Typography variant="subtitle2">
-                      {comment.user?.name || "Anonymous User"}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {formatDateTime(comment.date)}
-                    </Typography>
+            <Box sx={{ mt: 4 }}>
+              {post.comments.map((comment: Comment) => (
+                <Box key={comment._id}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      gap: 2,
+                      mb: 2,
+                      p: 2,
+                      borderRadius: 1,
+                      bgcolor: "background.paper",
+                      boxShadow: 1,
+                    }}
+                  >
+                    <Link
+                      to={`/user/${comment.user._id}`}
+                      style={{ textDecoration: "none" }}
+                    >
+                      <Avatar
+                        src={comment.user.profilePicture}
+                        alt={comment.user.name}
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          border: "2px solid",
+                          borderColor: "primary.main",
+                          cursor: "pointer",
+                          "&:hover": {
+                            opacity: 0.8,
+                          },
+                        }}
+                      />
+                    </Link>
+                    <Box sx={{ flex: 1 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          mb: 0.5,
+                        }}
+                      >
+                        <Link
+                          to={`/user/${comment.user._id}`}
+                          style={{ textDecoration: "none", color: "inherit" }}
+                        >
+                          <Typography
+                            variant="subtitle2"
+                            sx={{ fontWeight: 600 }}
+                          >
+                            {comment.user.name}
+                          </Typography>
+                        </Link>
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(comment.date).toLocaleDateString()}
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2">{comment.text}</Typography>
+                      {user && (
+                        <Button
+                          size="small"
+                          onClick={() => setReplyingTo(comment._id)}
+                          sx={{ mt: 1 }}
+                        >
+                          Reply
+                        </Button>
+                      )}
+                    </Box>
                   </Box>
-                </Box>
-                <Typography variant="body2" sx={{ ml: 7 }}>
-                  {comment.text || "No content"}
-                </Typography>
-              </Box>
-            ))}
 
-            {/* Only show comment form to logged in users */}
+                  {/* Reply Form */}
+                  {replyingTo === comment._id && user && (
+                    <Box sx={{ ml: 7, mb: 2 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder="Write a reply..."
+                        multiline
+                        rows={2}
+                        sx={{ mb: 1 }}
+                      />
+                      <Box sx={{ display: "flex", gap: 1 }}>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          disabled={isSubmitting}
+                          onClick={() => handleReplySubmit(comment._id)}
+                        >
+                          {isSubmitting ? "Posting..." : "Post Reply"}
+                        </Button>
+                        <Button
+                          size="small"
+                          onClick={() => {
+                            setReplyingTo(null);
+                            setReplyText("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </Box>
+                    </Box>
+                  )}
+
+                  {/* Replies */}
+                  {comment.replies?.map((reply: Reply) => (
+                    <Box
+                      key={reply._id}
+                      sx={{
+                        display: "flex",
+                        gap: 2,
+                        ml: 7,
+                        mb: 2,
+                        p: 2,
+                        borderRadius: 1,
+                        bgcolor: "background.paper",
+                        boxShadow: 1,
+                      }}
+                    >
+                      <Link
+                        to={`/user/${reply.user._id}`}
+                        style={{ textDecoration: "none" }}
+                      >
+                        <Avatar
+                          src={reply.user.profilePicture}
+                          alt={reply.user.name}
+                          sx={{
+                            width: 32,
+                            height: 32,
+                            border: "2px solid",
+                            borderColor: "primary.main",
+                            cursor: "pointer",
+                            "&:hover": {
+                              opacity: 0.8,
+                            },
+                          }}
+                        />
+                      </Link>
+                      <Box sx={{ flex: 1 }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            mb: 0.5,
+                          }}
+                        >
+                          <Link
+                            to={`/user/${reply.user._id}`}
+                            style={{ textDecoration: "none", color: "inherit" }}
+                          >
+                            <Typography
+                              variant="subtitle2"
+                              sx={{ fontWeight: 600 }}
+                            >
+                              {reply.user.name}
+                            </Typography>
+                          </Link>
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(reply.date).toLocaleDateString()}
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2">{reply.text}</Typography>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              ))}
+            </Box>
+
             <Box sx={{ mt: 4 }}>
               {user ? (
                 <Box
