@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { createBlog } from "../../services/blogService";
 import {
@@ -36,15 +36,21 @@ const categories = [
 const extractDirectImageUrl = (url: string): string => {
   try {
     const urlObj = new URL(url);
-    // Handle Brave search URLs by extracting the source URL from context parameter
-    if (urlObj.hostname === "search.brave.com") {
-      const context = urlObj.searchParams.get("context");
-      if (context) {
-        const contextData = JSON.parse(decodeURIComponent(context));
-        if (contextData[0]?.src) {
-          return contextData[0].src;
-        }
+    // Handle Brave search URLs
+    if (urlObj.hostname === "imgs.search.brave.com") {
+      // Extract the actual image URL from the encoded URL
+      const encodedUrl = url.split("/g:ce/")[1];
+      if (encodedUrl) {
+        const decodedUrl = atob(encodedUrl);
+        return decodedUrl;
       }
+    }
+    // Handle Pixabay and other image hosting services
+    if (
+      urlObj.hostname.includes("pixabay.com") ||
+      urlObj.hostname.includes("cloudinary.com")
+    ) {
+      return url;
     }
     return url;
   } catch {
@@ -69,6 +75,8 @@ function CreatePost() {
     coverImage: "", // Add coverImage error
   });
   const [submitError, setSubmitError] = useState<string>("");
+
+  const quillRef = useRef<ReactQuill>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -154,13 +162,15 @@ function CreatePost() {
 
   const isValidUrl = (url: string) => {
     try {
-      new URL(url);
-      // Accept more image formats and validate less strictly
+      const urlObj = new URL(url);
+      // Add support for more image hosting services
       return (
         /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/i.test(url) ||
         /images\.unsplash\.com/i.test(url) ||
         /cloudinary\.com/i.test(url) ||
-        /imgbb\.com/i.test(url)
+        /imgbb\.com/i.test(url) ||
+        /pixabay\.com.*\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(url) ||
+        /imgs\.search\.brave\.com/i.test(url)
       );
     } catch {
       return false;
@@ -366,6 +376,10 @@ function CreatePost() {
                   <img
                     src={formData.coverImage}
                     alt="Cover preview"
+                    onLoad={() => {
+                      // Clear any error when image loads successfully
+                      setErrors((prev) => ({ ...prev, coverImage: "" }));
+                    }}
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.onerror = null;
@@ -373,10 +387,9 @@ function CreatePost() {
                       setErrors((prev) => ({
                         ...prev,
                         coverImage:
-                          "Unable to load image. Please check if it's a valid direct image URL",
+                          "Unable to load image. Please check the URL or try another image",
                       }));
-                      // Fallback SVG with updated styling
-                      target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25' viewBox='0 0 800 450'%3E%3Crect width='800' height='450' fill='%23f0f0f0'/%3E%3Ctext x='400' y='225' font-family='Arial' font-size='16' fill='%23666666' text-anchor='middle' dominant-baseline='middle'%3EInvalid Image URL%0APlease use a direct image link%3C/text%3E%3C/svg%3E`;
+                      target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25' viewBox='0 0 800 450'%3E%3Crect width='800' height='450' fill='%23f0f0f0'/%3E%3Ctext x='400' y='225' font-family='Arial' font-size='16' fill='%23666666' text-anchor='middle' dominant-baseline='middle'%3EUnable to load image%3C/text%3E%3C/svg%3E`;
                     }}
                     loading="lazy"
                   />
@@ -391,21 +404,25 @@ function CreatePost() {
               <Box
                 sx={{
                   "& .quill": {
-                    height: 350,
+                    height: "auto",
                     mb: 2,
-                    "& .ql-editor": {
-                      minHeight: 300,
+                    "& .ql-container": {
+                      minHeight: "300px",
+                      maxHeight: "600px",
+                      overflow: "auto",
                     },
                   },
                 }}
               >
                 <ReactQuill
+                  ref={quillRef}
                   theme="snow"
                   value={formData.content}
                   onChange={handleEditorChange}
                   modules={modules}
                   formats={formats}
                   preserveWhitespace
+                  placeholder="Write your blog post content here..."
                 />
               </Box>
               {errors.content && (

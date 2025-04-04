@@ -6,12 +6,16 @@ const User = require("../models/User"); // Ensure this path and model name are c
 const auth = require("../middleware/auth");
 const { sendResetPasswordEmail } = require("../utils/email");
 const bcrypt = require("bcryptjs");
+const multer = require("multer");
+const cloudinary = require("../config/cloudinary");
+const upload = multer({ dest: "uploads/" });
 
 // @route   POST /api/auth/register
 // @desc    Register a new user
 // @access  Public
 router.post(
   "/register",
+  upload.single("profilePicture"), // Add this line before the validation middleware
   [
     body("name").trim().notEmpty().withMessage("Name is required"),
     body("email").isEmail().withMessage("Please enter a valid email"),
@@ -47,6 +51,22 @@ router.post(
         email,
         password,
       });
+
+      // Handle profile picture upload if provided
+      if (req.file) {
+        try {
+          const result = await cloudinary.uploader.upload(req.file.path, {
+            folder: "blogverse/avatars",
+            width: 400,
+            height: 400,
+            crop: "fill",
+          });
+          user.profilePicture = result.secure_url;
+        } catch (uploadError) {
+          console.error("Cloudinary upload error:", uploadError);
+          // Continue registration even if image upload fails
+        }
+      }
 
       await user.save();
 
@@ -273,53 +293,32 @@ router.get("/me", auth, async (req, res) => {
 router.put(
   "/profile",
   auth,
-  [
-    body("name").trim().optional(),
-    body("email").isEmail().optional(),
-    body("username")
-      .trim()
-      .optional()
-      .custom(async (value, { req }) => {
-        if (!value) return true;
-        const user = await User.findOne({ username: value });
-        if (user && user._id.toString() !== req.user.id) {
-          throw new Error("Username is already taken");
-        }
-        return true;
-      }),
-    body("bio").trim().optional(),
-    body("location").trim().optional(),
-    body("phoneNumber").trim().optional(),
-    body("occupation").trim().optional(),
-    body("skills").isArray().optional(),
-    body("socialLinks").isObject().optional(),
-  ],
+  upload.single("profilePicture"),
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: errors.array()[0].msg,
-        });
+      const updateFields = {};
+
+      // Handle text fields
+      if (req.body.bio !== undefined) updateFields.bio = req.body.bio;
+      if (req.body.socialLinks) {
+        updateFields.socialLinks = JSON.parse(req.body.socialLinks);
       }
 
-      const updateFields = {
-        ...req.body,
-      };
-
-      // Remove undefined fields
-      Object.keys(updateFields).forEach(
-        (key) => updateFields[key] === undefined && delete updateFields[key]
-      );
-
-      // Check if username is valid (only alphanumeric and underscore)
-      if (updateFields.username) {
-        if (!/^[a-zA-Z0-9_]+$/.test(updateFields.username)) {
+      // Handle profile picture upload
+      if (req.file) {
+        try {
+          const result = await cloudinary.uploader.upload(req.file.path, {
+            folder: "blogverse/avatars",
+            width: 400,
+            height: 400,
+            crop: "fill",
+          });
+          updateFields.profilePicture = result.secure_url;
+        } catch (uploadError) {
+          console.error("Cloudinary upload error:", uploadError);
           return res.status(400).json({
             success: false,
-            message:
-              "Username can only contain letters, numbers and underscores",
+            message: "Failed to upload profile picture",
           });
         }
       }

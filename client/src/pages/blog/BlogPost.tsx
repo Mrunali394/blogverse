@@ -210,30 +210,36 @@ function BlogPost() {
           {post.coverImage && (
             <Box
               sx={{
-                mb: 3,
+                mb: 4,
                 width: "100%",
-                height: "auto",
-                maxHeight: "600px",
-                borderRadius: 1,
+                position: "relative",
+                paddingTop: "50%", // 2:1 aspect ratio
+                borderRadius: 2,
                 overflow: "hidden",
                 bgcolor: "background.paper",
-                position: "relative",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                "& img": {
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  transition: "opacity 0.3s ease",
+                },
               }}
             >
               <img
                 src={post.coverImage}
                 alt={post.title}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  display: "block",
-                }}
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.onerror = null;
-                  target.src = "/placeholder-image.png";
+                  target.style.opacity = "0.5";
+                  target.src =
+                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25' viewBox='0 0 800 400'%3E%3Crect width='800' height='400' fill='%23f0f0f0'/%3E%3Ctext x='400' y='200' font-family='Arial' font-size='16' fill='%23666666' text-anchor='middle' dominant-baseline='middle'%3EImage not available%3C/text%3E%3C/svg%3E";
                 }}
+                loading="lazy"
               />
             </Box>
           )}

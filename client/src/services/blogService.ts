@@ -13,31 +13,87 @@ interface BlogData {
 }
 
 export const createBlog = async (blogData: BlogData) => {
-  const token = localStorage.getItem("token");
   try {
-    console.log("Creating blog with data:", blogData); // Add logging
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("No authentication token found");
 
-    const response = await axios.post(
-      API_URL,
-      {
-        ...blogData,
-        isDraft: Boolean(blogData.isDraft), // Ensure boolean conversion
-        status: blogData.isDraft ? "draft" : "published",
-        publishedAt: blogData.isDraft ? null : new Date(),
+    const requestData = {
+      title: blogData.title.trim(),
+      content: blogData.content.trim(),
+      category: blogData.category.trim(),
+      coverImage: blogData.coverImage?.trim() || "",
+      isDraft: Boolean(blogData.isDraft),
+      status: blogData.isDraft ? "draft" : "published",
+      publishedAt: blogData.isDraft ? null : new Date().toISOString(),
+    };
+
+    const contentLength = requestData.content.length;
+    const maxContentLength = 100000; // 100KB limit
+
+    // Validate content length before making the request
+    if (contentLength > maxContentLength) {
+      throw new Error(
+        `Content exceeds maximum length of ${maxContentLength} characters (current: ${contentLength})`
+      );
+    }
+
+    // Validate content length after stripping HTML
+    const textContent = requestData.content.replace(/<[^>]*>/g, "").trim();
+
+    // Basic validations
+    if (!requestData.title || requestData.title.length < 5) {
+      throw new Error("Title must be at least 5 characters long");
+    }
+
+    if (requestData.title.length > 200) {
+      throw new Error("Title must be less than 200 characters");
+    }
+
+    if (!requestData.category) {
+      throw new Error("Category is required");
+    }
+
+    if (textContent.length < 50) {
+      throw new Error(
+        "Content must be at least 50 characters long (without HTML)"
+      );
+    }
+
+    console.log("Sending blog creation request:", {
+      ...requestData,
+      contentLength,
+      title: requestData.title,
+      category: requestData.category,
+    });
+
+    const response = await axios.post(API_URL, requestData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+      timeout: 15000,
+      validateStatus: (status) => status < 500, // Don't reject if status < 500
+    });
 
-    console.log("Blog creation response:", response.data); // Add logging
+    if (response.status === 400) {
+      throw new Error(response.data.message || "Validation failed");
+    }
+
     return response.data;
   } catch (error: any) {
-    console.error("Error creating blog:", error.response?.data || error);
-    throw error;
+    console.error("Blog creation error details:", {
+      error: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      data: error.response?.data,
+    });
+
+    // Handle different types of errors
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data.message);
+    }
+
+    throw new Error(error.message || "Failed to create blog post");
   }
 };
 
