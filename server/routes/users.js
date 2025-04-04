@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose"); // Add this line
 const User = require("../models/User"); // Ensure this path and model name are correct
 const auth = require("../middleware/auth");
 const Blog = require("../models/Blog"); // Ensure this path and model name are correct
@@ -114,42 +115,89 @@ router.get("/me", auth, async (req, res) => {
 router.post("/:id/follow", auth, async (req, res) => {
   try {
     if (req.params.id === req.user.id) {
-      return res.status(400).json({ msg: "Cannot follow yourself" });
+      return res.status(400).json({ message: "Cannot follow yourself" });
     }
 
     const userToFollow = await User.findById(req.params.id);
     const currentUser = await User.findById(req.user.id);
 
     if (!userToFollow || !currentUser) {
-      return res.status(404).json({ msg: "User not found" });
+      return res.status(404).json({ message: "User not found" });
     }
 
-    if (currentUser.following.includes(req.params.id)) {
-      return res.status(400).json({ msg: "Already following" });
+    const alreadyFollowing = currentUser.following.includes(req.params.id);
+    if (alreadyFollowing) {
+      return res.status(400).json({ message: "Already following this user" });
     }
 
     currentUser.following.push(req.params.id);
     userToFollow.followers.push(req.user.id);
 
-    // Create notification
-    userToFollow.notifications.unshift({
-      type: "follow",
-      from: req.user.id,
-      text: `${currentUser.name} started following you`,
-    });
-
     await Promise.all([currentUser.save(), userToFollow.save()]);
 
-    // Send email notification if enabled
-    if (userToFollow.emailPreferences.newFollower) {
-      await sendNotificationEmail(
-        userToFollow.email,
-        "New Follower",
-        `${currentUser.name} started following you on BlogVerse!`
-      );
+    // Send response with updated counts
+    res.json({
+      message: "User followed successfully",
+      followers: userToFollow.followers.length,
+      following: currentUser.following.length,
+      isFollowing: true,
+    });
+  } catch (err) {
+    console.error("Follow error:", err);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
+// @route   POST api/users/:id/unfollow
+// @desc    Unfollow a user
+// @access  Private
+router.post("/:id/unfollow", auth, async (req, res) => {
+  try {
+    const userToUnfollow = await User.findById(req.params.id);
+    const currentUser = await User.findById(req.user.id);
+
+    if (!userToUnfollow || !currentUser) {
+      return res.status(404).json({ msg: "User not found" });
     }
 
-    res.json({ msg: "User followed successfully" });
+    // Remove from following/followers arrays
+    currentUser.following = currentUser.following.filter(
+      (id) => id.toString() !== req.params.id
+    );
+    userToUnfollow.followers = userToUnfollow.followers.filter(
+      (id) => id.toString() !== req.user.id
+    );
+
+    await Promise.all([currentUser.save(), userToUnfollow.save()]);
+    res.json({ msg: "User unfollowed successfully" });
+  } catch (err) {
+    res.status(500).send("Server Error");
+  }
+});
+
+// @route   GET api/users/:id/followers
+// @desc    Get user's followers
+// @access  Public
+router.get("/:id/followers", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .populate("followers", "name profilePicture bio")
+      .select("followers");
+    res.json(user.followers);
+  } catch (err) {
+    res.status(500).send("Server Error");
+  }
+});
+
+// @route   GET api/users/:id/following
+// @desc    Get users that a user is following
+// @access  Public
+router.get("/:id/following", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .populate("following", "name profilePicture bio")
+      .select("following");
+    res.json(user.following);
   } catch (err) {
     res.status(500).send("Server Error");
   }
@@ -288,47 +336,96 @@ router.get("/dashboard/activity", auth, async (req, res) => {
 // @access  Public
 router.get("/profile/:id", async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select(
-      "-password -resetPasswordToken -resetPasswordExpire -notifications -emailPreferences"
-    );
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid user ID format" });
+    }
+
+    // Find user
+    const user = await User.findById(id)
+      .select("-password -resetPasswordToken -resetPasswordExpire")
+      .lean();
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Get user's published blogs and count
-    const [blogs, postsCount] = await Promise.all([
-      Blog.find({ user: req.params.id, status: "published" })
-        .sort({ createdAt: -1 })
-        .select(
-          "title content category coverImage createdAt likesCount commentsCount"
-        ),
-      Blog.countDocuments({ user: req.params.id, status: "published" }),
-    ]);
+    // Get user's published blogs with error handling
+    let blogs = [];
+    let postsCount = 0;
 
-    // Get follower status if authenticated request
-    const isFollowing = req.user ? user.followers.includes(req.user.id) : false;
+    try {
+      [blogs, postsCount] = await Promise.all([
+        Blog.find({ user: id, status: "published" })
+          .sort({ createdAt: -1 })
+          .select(
+            "title content category coverImage createdAt likesCount commentsCount views"
+          )
+          .lean(),
+        Blog.countDocuments({ user: id, status: "published" }),
+      ]);
+    } catch (error) {
+      console.error("Error fetching blogs:", error);
+      blogs = [];
+      postsCount = 0;
+    }
+
+    // Add follower status if authenticated request
+    let isFollowing = false;
+    if (req.user && user.followers) {
+      isFollowing = user.followers.some(
+        (followerId) => followerId.toString() === req.user.id
+      );
+    }
+
+    // Calculate total views
+    const totalViews = blogs.reduce((sum, blog) => sum + (blog.views || 0), 0);
+
+    // Get top category
+    const categories = blogs.map((blog) => blog.category).filter(Boolean);
+
+    const topCategory =
+      categories.length > 0
+        ? [...new Set(categories)].sort(
+            (a, b) =>
+              categories.filter((v) => v === b).length -
+              categories.filter((v) => v === a).length
+          )[0]
+        : "N/A";
 
     const userProfile = {
       _id: user._id,
-      name: user.name,
+      name: user.name || "",
       bio: user.bio || "",
-      profilePicture: user.profilePicture,
+      profilePicture: user.profilePicture || "",
+      location: user.location || "",
+      occupation: user.occupation || "",
+      expertise: user.expertise || [],
+      socialLinks: user.socialLinks || {},
+      role: user.role || "user",
       followers: user.followers?.length || 0,
       following: user.following?.length || 0,
       postsCount,
-      location: user.location,
-      occupation: user.occupation,
-      socialLinks: user.socialLinks,
-      blogs: blogs,
+      blogs: blogs.map((blog) => ({
+        ...blog,
+        views: blog.views || 0,
+        likesCount: blog.likesCount || 0,
+        commentsCount: blog.commentsCount || 0,
+      })),
       isFollowing,
       joinedDate: user.createdAt,
+      totalViews,
+      topCategory,
     };
 
     res.json(userProfile);
   } catch (err) {
-    console.error("Error fetching user profile:", err);
-    res.status(500).json({ message: "Failed to fetch user profile" });
+    console.error("Error in profile/:id route:", err);
+    res.status(500).json({
+      message: "Server error while fetching profile",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 });
 

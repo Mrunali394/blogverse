@@ -28,6 +28,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
 import { updateProfile } from "../api/profile";
+import FollowersListDialog from "../components/FollowersListDialog";
 
 interface SocialLink {
   platform: string;
@@ -51,6 +52,15 @@ function Profile() {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [openDialog, setOpenDialog] = useState<"followers" | "following" | null>(null);
+
+  const handleDialogClose = () => {
+    setOpenDialog(null);
+  };
+
+  const handleStatsClick = (type: "followers" | "following") => {
+    setOpenDialog(type);
+  };
 
   const stats = [
     {
@@ -62,11 +72,13 @@ function Profile() {
       label: "Followers",
       value: user?.followers?.length || 0,
       icon: <Group sx={{ color: "primary.main", fontSize: 32 }} />,
+      onClick: () => handleStatsClick("followers"),
     },
     {
       label: "Following",
       value: user?.following?.length || 0,
       icon: <PersonAdd sx={{ color: "primary.main", fontSize: 32 }} />,
+      onClick: () => handleStatsClick("following"),
     },
   ];
 
@@ -227,6 +239,7 @@ function Profile() {
             <Grid item xs={12} sm={4} key={stat.label}>
               <Paper
                 elevation={0}
+                onClick={stat.onClick}
                 sx={{
                   p: 3,
                   height: "100%",
@@ -234,10 +247,11 @@ function Profile() {
                   borderRadius: 2,
                   bgcolor: "background.default",
                   transition: "transform 0.2s ease-in-out",
+                  cursor: stat.onClick ? "pointer" : "default",
                   "&:hover": {
-                    transform: "translateY(-4px)",
+                    transform: stat.onClick ? "translateY(-4px)" : "none",
                     boxShadow: (theme) =>
-                      `0 4px 20px ${theme.palette.primary.main}25`,
+                      stat.onClick ? `0 4px 20px ${theme.palette.primary.main}25` : "none",
                   },
                 }}
               >
@@ -332,6 +346,13 @@ function Profile() {
           </Grid>
         </Box>
       </Paper>
+
+      <FollowersListDialog
+        open={!!openDialog}
+        onClose={handleDialogClose}
+        userId={user?._id || ""}
+        type={openDialog || "followers"}
+      />
     </Container>
   );
 }

@@ -42,9 +42,19 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const fetchNotifications = async () => {
     try {
+      // Only fetch if user is logged in
+      if (!user?._id) {
+        return;
+      }
+
       const data = await getNotifications();
       setNotifications(data);
     } catch (error: any) {
+      if (error.response?.status === 401) {
+        // Handle unauthorized error silently
+        console.warn("User not authenticated for notifications");
+        return;
+      }
       const message =
         error.response?.data?.message || "Failed to fetch notifications";
       toast.error(message);

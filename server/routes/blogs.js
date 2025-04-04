@@ -187,44 +187,45 @@ router.get("/category/:category", async (req, res) => {
 // @access  Public
 router.get("/:id", async (req, res) => {
   try {
-    const blogData = await Blog.findById(req.params.id).populate(
-      "user",
-      "name"
-    );
+    const blog = await Blog.findById(req.params.id)
+      .populate("user", "name profilePicture")
+      .populate({
+        path: "comments.user",
+        select: "name profilePicture",
+      })
+      .populate({
+        path: "comments.replies.user", // Add this population for replies
+        select: "name profilePicture",
+      });
 
-    if (!blogData) {
+    if (!blog) {
       return res.status(404).json({ msg: "Blog not found" });
     }
 
     // Ensure HTTPS for cover image
-    if (blogData.coverImage) {
-      const isValidImage = await cloudinary.validateImageUrl(
-        blogData.coverImage
-      );
+    if (blog.coverImage) {
+      const isValidImage = await cloudinary.validateImageUrl(blog.coverImage);
       if (!isValidImage) {
-        blogData.coverImage = null; // Clear invalid image URL
+        blog.coverImage = null; // Clear invalid image URL
       } else {
-        blogData.coverImage = blogData.coverImage.replace(
-          "http://",
-          "https://"
-        );
+        blog.coverImage = blog.coverImage.replace("http://", "https://");
 
         // Add Cloudinary optimization parameters for blog cover images
-        if (blogData.coverImage.includes("cloudinary.com")) {
-          const imageUrl = new URL(blogData.coverImage);
+        if (blog.coverImage.includes("cloudinary.com")) {
+          const imageUrl = new URL(blog.coverImage);
           const transformationString = "/c_fill,w_1200,h_630,q_auto,f_auto";
           const pathParts = imageUrl.pathname.split("/");
           const uploadIndex = pathParts.indexOf("upload");
           if (uploadIndex !== -1) {
             pathParts.splice(uploadIndex + 1, 0, transformationString);
             imageUrl.pathname = pathParts.join("/");
-            blogData.coverImage = imageUrl.toString();
+            blog.coverImage = imageUrl.toString();
           }
         }
       }
     }
 
-    res.json(blogData);
+    res.json(blog);
   } catch (err) {
     console.error(err.message);
     if (err.kind === "ObjectId") {
@@ -447,24 +448,70 @@ router.post("/:id/like", auth, async (req, res) => {
 router.post("/:id/comments", auth, async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id);
-    if (!blog) {
-      return res.status(404).json({ msg: "Blog not found" });
-    }
+    const user = await User.findById(req.user.id).select("name profilePicture");
 
-    const user = await User.findById(req.user.id).select("-password");
     const newComment = {
       text: req.body.text,
-      name: user.name,
       user: req.user.id,
+      name: user.name,
+      profilePicture: user.profilePicture,
     };
 
     blog.comments.unshift(newComment);
     blog.commentsCount++;
     await blog.save();
 
-    res.json(blog.comments);
+    // Populate the user details for the new comment
+    const populatedBlog = await Blog.findById(req.params.id).populate({
+      path: "comments.user",
+      select: "name profilePicture",
+    });
+
+    res.json(populatedBlog.comments);
   } catch (err) {
     res.status(500).send("Server Error");
+  }
+});
+
+// @route   POST api/blogs/:id/comments/:commentId/replies
+// @desc    Add reply to a comment
+// @access  Private
+router.post("/:id/comments/:commentId/replies", auth, async (req, res) => {
+  try {
+    const blog = await Blog.findById(req.params.id);
+    if (!blog) {
+      return res.status(404).json({ msg: "Blog not found" });
+    }
+
+    const comment = blog.comments.id(req.params.commentId);
+    if (!comment) {
+      return res.status(404).json({ msg: "Comment not found" });
+    }
+
+    // Create the reply with minimal required fields
+    const newReply = {
+      user: req.user.id,
+      text: req.body.text,
+      date: new Date(),
+    };
+
+    comment.replies.unshift(newReply);
+    await blog.save();
+
+    // Fetch and populate the blog with all user details
+    const populatedBlog = await Blog.findById(req.params.id)
+      .populate("user", "name profilePicture")
+      .populate("comments.user", "name profilePicture")
+      .populate("comments.replies.user", "name profilePicture");
+
+    // Return just the updated comments array
+    res.json(populatedBlog.comments);
+  } catch (err) {
+    console.error("Error adding reply:", err);
+    res.status(500).json({
+      message: "Server Error while adding reply",
+      error: err.message,
+    });
   }
 });
 
@@ -660,6 +707,52 @@ router.get("/blog-search", async (req, res) => {
   } catch (err) {
     console.error("Error searching blogs:", err);
     res.status(500).json({ message: "Failed to search blogs" });
+  }
+});
+
+// @route   GET api/blogs/feed
+// @desc    Get posts from followed users
+// @access  Private
+router.get("/feed", auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    const blogs = await Blog.find({
+      user: { $in: user.following },
+      status: "published",
+    })
+      .sort({ createdAt: -1 })
+      .populate("user", "name profilePicture");
+
+    res.json(blogs);
+  } catch (err) {
+    res.status(500).send("Server Error");
+  }
+});
+
+// @route   GET api/blogs/recommendations
+// @desc    Get recommended posts based on followed users and interests
+// @access  Private
+router.get("/recommendations", auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    const followedUsers = user.following;
+
+    // Get posts from followed users and similar categories
+    const blogs = await Blog.find({
+      $or: [
+        { user: { $in: followedUsers } },
+        { category: { $in: user.interests } },
+      ],
+      status: "published",
+      user: { $ne: req.user.id },
+    })
+      .sort({ createdAt: -1, likesCount: -1 })
+      .limit(10)
+      .populate("user", "name profilePicture");
+
+    res.json(blogs);
+  } catch (err) {
+    res.status(500).send("Server Error");
   }
 });
 

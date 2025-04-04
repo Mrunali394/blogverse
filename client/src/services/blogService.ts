@@ -226,6 +226,42 @@ export const addComment = async (blogId: string, text: string) => {
   }
 };
 
+export const addReply = async (
+  blogId: string,
+  commentId: string,
+  text: string
+) => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      throw new Error("Authentication required");
+    }
+
+    const response = await axios.post(
+      `${API_URL}/${blogId}/comments/${commentId}/replies`,
+      { text },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.data) {
+      throw new Error("No data received from server");
+    }
+
+    // Return the updated comments array
+    return response.data;
+  } catch (error: any) {
+    console.error("Error adding reply:", error.response?.data || error);
+    throw new Error(
+      error.response?.data?.message || error.message || "Failed to add reply"
+    );
+  }
+};
+
 export const searchBlogs = async (query: string, page = 1, limit = 10) => {
   try {
     const response = await axios.get(`${API_URL}/v1/search`, {

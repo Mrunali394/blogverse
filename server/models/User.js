@@ -108,6 +108,20 @@ const UserSchema = new mongoose.Schema(
       blogLiked: { type: Boolean, default: true },
       newsletter: { type: Boolean, default: true },
     },
+    expertise: [
+      {
+        type: String,
+        default: [],
+      },
+    ],
+    topCategory: {
+      type: String,
+      default: "",
+    },
+    totalViews: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
