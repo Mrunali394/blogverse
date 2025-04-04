@@ -157,34 +157,37 @@ function Navbar() {
   const debouncedSearch = debounce(async (query: string) => {
     if (!query.trim()) {
       setSearchResults([]);
+      setShowResults(false);
       return;
     }
 
     try {
       setIsSearching(true);
-      const [blogResults, userResults] = await Promise.all([
+      const [{ blogs: blogResults }, userResults] = await Promise.all([
         searchBlogs(query),
         searchUsers(query),
       ]);
 
       const combinedResults = [
-        ...blogResults.map((blog: any) => ({
+        ...(blogResults?.map((blog: any) => ({
           _id: blog._id,
           title: blog.title,
           type: "blog" as const,
-        })),
-        ...userResults.map((user: any) => ({
+        })) || []),
+        ...(userResults?.map((user: any) => ({
           _id: user._id,
           name: user.name,
           profilePicture: user.profilePicture,
           type: "user" as const,
-        })),
+        })) || []),
       ].slice(0, 5);
 
       setSearchResults(combinedResults);
       setShowResults(true);
     } catch (error) {
+      console.error("Search error:", error);
       toast.error("Failed to perform search");
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
@@ -193,12 +196,21 @@ function Navbar() {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
-    debouncedSearch(query);
+    if (query.trim()) {
+      debouncedSearch(query);
+    } else {
+      setSearchResults([]);
+      setShowResults(false);
+    }
   };
 
-  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      debouncedSearch(searchQuery);
+  const handleSearchNavigate = (result: SearchResultItem) => {
+    setShowResults(false);
+    setSearchQuery("");
+    if (result.type === "blog") {
+      navigate(`/blog/${result._id}`);
+    } else {
+      navigate(`/user/${result._id}`); // Changed from /profile/ to /user/
     }
   };
 
@@ -222,7 +234,7 @@ function Navbar() {
     ...(user
       ? [
           { text: "Dashboard", icon: <DashboardIcon />, to: "/dashboard" },
-          { text: "Profile", icon: <PersonIcon />, to: "/profile" },
+          { text: "Profile", icon: <PersonIcon />, to: `/user/${user._id}` }, // Changed from /profile to /user/:id
           { text: "Logout", icon: <LogoutIcon />, onClick: handleLogout },
         ]
       : [
@@ -366,10 +378,13 @@ function Navbar() {
                   placeholder="Search blogs and users..."
                   value={searchQuery}
                   onChange={handleSearchChange}
-                  onKeyPress={(e) =>
-                    e.key === "Enter" &&
-                    navigate("/search", { state: { query: searchQuery } })
-                  }
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter" && searchQuery.trim()) {
+                      navigate("/search", { state: { query: searchQuery } });
+                      setShowResults(false);
+                      setSearchQuery("");
+                    }
+                  }}
                 />
                 {showResults && searchResults.length > 0 && (
                   <Paper
@@ -392,13 +407,7 @@ function Navbar() {
                     {searchResults.map((result) => (
                       <MenuItem
                         key={result._id}
-                        component={Link}
-                        to={
-                          result.type === "blog"
-                            ? `/blog/${result._id}`
-                            : `/user/${result._id}`
-                        }
-                        onClick={() => setShowResults(false)}
+                        onClick={() => handleSearchNavigate(result)}
                         sx={{
                           py: 1,
                           px: 2,
@@ -441,6 +450,7 @@ function Navbar() {
                       onClick={() => {
                         navigate("/search", { state: { query: searchQuery } });
                         setShowResults(false);
+                        setSearchQuery("");
                       }}
                       sx={{
                         justifyContent: "center",
@@ -527,7 +537,7 @@ function Navbar() {
                       </MenuItem>
                       <MenuItem
                         component={Link}
-                        to="/profile"
+                        to={`/user/${user._id}`} // Changed from /profile to /user/:id
                         onClick={handleMenuClose}
                         sx={{
                           display: "flex",
